@@ -1,0 +1,71 @@
+# =======================
+# Archivos generados por el sistema operativo
+# =======================
+.DS_Store
+Thumbs.db
+
+# =======================
+# Dependencias de Node.js
+# =======================
+node_modules/
+.pnp
+.pnp.js
+
+# =======================
+# Build de Next.js
+# =======================
+apps/web/.next/
+apps/web/out/
+
+# =======================
+# Variables de entorno (nunca subir al repo)
+# =======================
+.env
+.env.local
+.env.production
+.env.development
+apps/web/.env
+apps/web/.env.local
+apps/api/.env
+
+# =======================
+# Entorno virtual de Python
+# =======================
+apps/api/venv/
+apps/api/.venv/
+apps/api/__pycache__/
+apps/api/**/__pycache__/
+apps/api/**/*.pyc
+apps/api/**/*.pyo
+
+# =======================
+# Archivos de audio temporales (generados en procesamiento)
+# =======================
+apps/api/temp/
+apps/api/uploads/
+
+# =======================
+# Logs
+# =======================
+*.log
+logs/
+
+# =======================
+# IDEs y editores
+# =======================
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# =======================
+# Celery
+# =======================
+celerybeat-schedule
+celerybeat.pid
+
+# =======================
+# pytest
+# =======================
+.pytest_cache/
+apps/api/.pytest_cache/
