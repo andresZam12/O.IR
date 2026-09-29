@@ -1,0 +1,44 @@
+# ===================================================
+# Dependencias del backend de O.IR
+# ===================================================
+
+# --- Servidor web y API ---
+fastapi==0.111.0
+uvicorn[standard]==0.29.0
+
+# --- Validación de datos ---
+pydantic==2.7.1
+pydantic-settings==2.2.1
+
+# --- Cola de tareas asíncronas ---
+celery==5.3.6
+redis==5.0.4
+
+# --- Procesamiento de audio ---
+librosa==0.10.2
+numpy==1.26.4
+soundfile==0.12.1
+ffmpeg-python==0.2.0
+
+# --- Descarga de audio desde YouTube ---
+yt-dlp==2024.5.27
+
+# --- Transcripción de letra (Whisper) ---
+openai-whisper==20231117
+
+# --- Cliente HTTP (para llamar a LRCLIB) ---
+httpx==0.27.0
+
+# --- Base de datos (Supabase / PostgreSQL) ---
+supabase==2.4.6
+sqlalchemy==2.0.30
+asyncpg==0.29.0
+
+# --- Subida de archivos / manejo de formularios ---
+python-multipart==0.0.9
+
+# --- Variables de entorno ---
+python-dotenv==1.0.1
+
+# --- CORS ---
+# (incluido en fastapi, solo se lista para claridad)
