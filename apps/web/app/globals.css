@@ -1,0 +1,72 @@
+/* ==============================================
+   globals.css — Estilos globales de O.IR
+   
+   Aquí se importan las capas de Tailwind y se definen
+   las variables CSS y estilos base que aplican a toda la app.
+   ============================================== */
+
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* --- Estilos base globales --- */
+@layer base {
+  html {
+    /* Fondo oscuro para toda la aplicación */
+    background-color: #0f0f13;
+    color: #f1f5f9;
+    font-family: "Inter", system-ui, sans-serif;
+    /* Suavizar el scroll en toda la página */
+    scroll-behavior: smooth;
+  }
+
+  /* Selección de texto con color de marca */
+  ::selection {
+    background-color: #7c3aed;
+    color: white;
+  }
+
+  /* Scrollbar personalizada (solo en navegadores Webkit) */
+  ::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: #1a1a24;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: #4c1d95;
+    border-radius: 3px;
+  }
+}
+
+/* --- Componentes reutilizables con Tailwind --- */
+@layer components {
+  /* Botón primario */
+  .btn-primary {
+    @apply bg-primary-600 hover:bg-primary-500 text-white font-medium
+           px-6 py-3 rounded-xl transition-all duration-200
+           focus:outline-none focus:ring-2 focus:ring-primary-400 focus:ring-offset-2 focus:ring-offset-surface-900;
+  }
+
+  /* Botón secundario (contorno) */
+  .btn-secondary {
+    @apply border border-primary-600 text-primary-400 hover:bg-primary-600 hover:text-white
+           font-medium px-6 py-3 rounded-xl transition-all duration-200;
+  }
+
+  /* Tarjeta con fondo oscuro */
+  .card {
+    @apply bg-surface-800 border border-surface-600 rounded-2xl p-6;
+  }
+
+  /* Input de texto */
+  .input-field {
+    @apply w-full bg-surface-700 border border-surface-600 text-white placeholder-slate-500
+           rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary-500
+           focus:border-transparent transition-all duration-200;
+  }
+}
