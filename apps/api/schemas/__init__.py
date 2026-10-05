@@ -16,6 +16,10 @@ from schemas.lyrics import (
     LyricLine,
     LyricsResult,
 )
+from schemas.difficulty import (
+    DifficultyMetrics,
+    DifficultyEvaluation,
+)
 
 __all__ = [
     "ChordItem",
@@ -25,4 +29,6 @@ __all__ = [
     "SongJobStatus",
     "LyricLine",
     "LyricsResult",
+    "DifficultyMetrics",
+    "DifficultyEvaluation",
 ]

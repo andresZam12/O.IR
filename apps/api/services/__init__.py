@@ -7,5 +7,6 @@ obtención de letra, cálculo de dificultad, etc.
 
 from services.chord_service import ChordDetectionService
 from services.lyrics_service import LyricsService
+from services.difficulty_service import DifficultyService
 
-__all__ = ["ChordDetectionService", "LyricsService"]
+__all__ = ["ChordDetectionService", "LyricsService", "DifficultyService"]
