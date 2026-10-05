@@ -12,6 +12,10 @@ from schemas.song import (
     SongJobResponse,
     SongJobStatus,
 )
+from schemas.lyrics import (
+    LyricLine,
+    LyricsResult,
+)
 
 __all__ = [
     "ChordItem",
@@ -19,4 +23,6 @@ __all__ = [
     "SongProcessRequest",
     "SongJobResponse",
     "SongJobStatus",
+    "LyricLine",
+    "LyricsResult",
 ]
