@@ -11,7 +11,10 @@ Implementa la lógica de procesamiento de señales de audio musical:
 
 from typing import Optional
 import numpy as np
-import librosa
+try:
+    import librosa
+except ImportError:
+    librosa = None  # type: ignore
 
 from schemas.song import ChordItem, ChordDetectionResult
 
