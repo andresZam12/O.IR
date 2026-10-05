@@ -33,10 +33,9 @@ app.add_middleware(
 
 # --- Registro de routers ---
 # Cada router maneja un grupo de endpoints relacionados
-# Se agregarán a medida que avance el desarrollo
-# from routes import songs, health
-# app.include_router(health.router, prefix="/health", tags=["health"])
-# app.include_router(songs.router, prefix="/api/songs", tags=["songs"])
+from routes.songs import router as songs_router
+
+app.include_router(songs_router, prefix="/api/songs", tags=["songs"])
 
 
 @app.get("/", tags=["root"])
