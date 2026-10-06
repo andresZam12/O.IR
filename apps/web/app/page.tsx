@@ -5,6 +5,7 @@ import SongInputForm from "@/components/features/SongInputForm";
 import ProcessingProgress from "@/components/features/ProcessingProgress";
 import KaraokeView from "@/components/features/KaraokeView";
 import DifficultyCard from "@/components/features/DifficultyCard";
+import PdfDownloadButton from "@/components/features/PdfDownloadButton";
 import { pollJobUntilComplete } from "@/services/api";
 import { ProcessedSongResult, SongJobStatus } from "@/types/song";
 
@@ -111,8 +112,8 @@ export default function HomePage() {
       {/* --- 3. Resultados: Karaoke + Dificultad (cuando culmina con éxito) --- */}
       {processedData && (
         <div className="w-full max-w-4xl space-y-8 animate-fade-in">
-          {/* Botón de reinicio / Nueva canción */}
-          <div className="flex justify-between items-center bg-slate-900/60 p-4 rounded-xl border border-slate-800">
+          {/* Botón de reinicio / Exportar PDF / Nueva canción */}
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-slate-900/60 p-4 rounded-xl border border-slate-800 gap-3">
             <div>
               <span className="text-xs text-slate-400">Canción analizada:</span>
               <p className="text-sm font-semibold text-white">
@@ -120,12 +121,15 @@ export default function HomePage() {
                 {processedData.lyrics?.artist ? `— ${processedData.lyrics.artist}` : ""}
               </p>
             </div>
-            <button
-              onClick={handleReset}
-              className="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold py-2 px-4 rounded-lg border border-slate-700 transition-colors"
-            >
-              🔄 Analizar otra canción
-            </button>
+            <div className="flex items-center gap-2.5">
+              <PdfDownloadButton data={processedData} />
+              <button
+                onClick={handleReset}
+                className="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold py-2 px-4 rounded-lg border border-slate-700 transition-colors"
+              >
+                🔄 Analizar otra
+              </button>
+            </div>
           </div>
 
           {/* Evaluación de Dificultad y Tips de Práctica */}
