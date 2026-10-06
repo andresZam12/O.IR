@@ -66,17 +66,23 @@ class AudioService:
         output_template = os.path.join(self.DOWNLOAD_DIR, f"{unique_id}.%(ext)s")
 
         ydl_opts = {
-            "format": "bestaudio/best",
+            "format": "ba[ext=m4a]/ba/b/bestaudio/best",
             "outtmpl": output_template,
-            "postprocessors": [
-                {
-                    "key": "FFmpegExtractAudio",
-                    "preferredcodec": "mp3",
-                    "preferredquality": "192",
-                }
-            ],
             "quiet": True,
             "no_warnings": True,
+            "extractor_args": {
+                "youtube": {
+                    "player_client": ["mweb", "android", "web"],
+                }
+            },
+            "http_headers": {
+                "User-Agent": (
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) "
+                    "Chrome/124.0.0.0 Safari/537.36"
+                ),
+                "Accept-Language": "en-US,en;q=0.9",
+            },
             # Evitar descargar videos excesivamente largos
             "max_filesize": 50 * 1024 * 1024,  # 50 MB
         }
@@ -98,9 +104,9 @@ class AudioService:
 
                 expected_file = os.path.join(self.DOWNLOAD_DIR, f"{unique_id}.mp3")
 
-                # Si FFmpeg no convirtió a mp3, buscar el archivo generado
+                # Si el archivo no es .mp3, buscar entre las extensiones comunes descargadas
                 if not os.path.exists(expected_file):
-                    for ext in [".m4a", ".webm", ".opus", ".wav"]:
+                    for ext in [".m4a", ".mp4", ".webm", ".opus", ".wav"]:
                         candidate = os.path.join(self.DOWNLOAD_DIR, f"{unique_id}{ext}")
                         if os.path.exists(candidate):
                             expected_file = candidate
