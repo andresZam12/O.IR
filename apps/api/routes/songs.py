@@ -4,6 +4,7 @@ routes/songs.py — Endpoints para el procesamiento y consulta de canciones
 
 import os
 import uuid
+from typing import Optional
 import aiofiles
 from fastapi import APIRouter, BackgroundTasks, File, HTTPException, UploadFile, status
 from celery.result import AsyncResult
