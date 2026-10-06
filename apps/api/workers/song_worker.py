@@ -8,8 +8,9 @@ hasta que la tarea termina.
 """
 
 import asyncio
+import logging
 import os
-from typing import Optional
+from typing import Any, Optional
 
 from core.celery_app import celery_app
 from services.chord_service import ChordDetectionService
@@ -18,10 +19,11 @@ from services.difficulty_service import DifficultyService
 from services.audio_service import AudioService
 from repositories.song_repository import SongRepository
 
+logger = logging.getLogger(__name__)
 
-@celery_app.task(bind=True, name="process_song")
-def process_song(
-    self,
+
+def execute_song_pipeline(
+    task_context: Any,
     audio_path: str,
     source: str,
     track_name: Optional[str] = None,
@@ -29,21 +31,15 @@ def process_song(
     identifier: Optional[str] = None,
 ) -> dict:
     """
-    Tarea principal: procesa un archivo de audio y extrae acordes + letra + dificultad.
-
-    Args:
-        audio_path: Ruta local al audio o URL de YouTube.
-        source: Origen del audio ('youtube', 'upload', 'microphone').
-        track_name: Título opcional de la canción para buscar letra en LRCLIB.
-        artist_name: Nombre opcional del artista.
-        identifier: Clave de hash para persistencia en caché.
-
-    Returns:
-        Diccionario con acordes, letra sincronizada, tonalidad y evaluación de dificultad.
+    Ejecuta el pipeline completo de procesamiento de una canción:
+    1. Descarga / resolución de audio
+    2. Detección de acordes con librosa
+    3. Búsqueda y sincronización de letra con LRCLIB
+    4. Evaluación objetiva de dificultad pedagógica
+    5. Cacheo en Supabase / JSON
     """
-
     # --- 1. Inicialización y descarga si proviene de YouTube ---
-    self.update_state(state="STARTED", meta={"progress": 10, "step": "iniciando"})
+    task_context.update_state(state="STARTED", meta={"progress": 10, "step": "iniciando"})
 
     effective_audio_path = audio_path
     effective_title = track_name
@@ -135,3 +131,23 @@ def process_song(
         audio_service.cleanup_file(effective_audio_path)
 
     return final_result
+
+
+@celery_app.task(bind=True, name="process_song")
+def process_song(
+    self,
+    audio_path: str,
+    source: str = "upload",
+    track_name: Optional[str] = None,
+    artist_name: Optional[str] = None,
+    identifier: Optional[str] = None,
+) -> dict:
+    """Wrapper de Celery para ejecutar el pipeline de la canción con contexto asíncrono."""
+    return execute_song_pipeline(
+        task_context=self,
+        audio_path=audio_path,
+        source=source,
+        track_name=track_name,
+        artist_name=artist_name,
+        identifier=identifier,
+    )
