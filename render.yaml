@@ -1,0 +1,19 @@
+# render.yaml — Blueprint de despliegue en Render (Tier gratuito)
+services:
+  - type: web
+    name: oir-api
+    runtime: docker
+    dockerfilePath: ./apps/api/Dockerfile
+    dockerContext: ./apps/api
+    plan: free
+    region: oregon
+    healthCheckPath: /health
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: PORT
+        value: 8000
+      - key: MAX_AUDIO_DURATION
+        value: 300
+      - key: ALLOWED_ORIGINS
+        sync: false
