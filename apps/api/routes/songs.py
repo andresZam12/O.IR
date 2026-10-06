@@ -15,6 +15,7 @@ from schemas.song import (
     SongJobStatus,
     SongProcessRequest,
 )
+from repositories.song_repository import SongRepository
 from workers.song_worker import process_song
 
 router = APIRouter()
@@ -64,8 +65,17 @@ async def upload_audio_file(file: UploadFile = File(...)) -> SongJobResponse:
             detail=f"Error guardando el archivo de audio: {str(e)}",
         )
 
-    # Despachar la tarea a Celery
-    task = process_song.delay(audio_path=saved_path, source="upload")
+    # Generar hash del archivo para caché
+    file_hash = SongRepository.generate_file_hash(saved_path)
+    track_title = os.path.splitext(file.filename)[0]
+
+    # Despachar la tarea a Celery con su clave de caché
+    task = process_song.delay(
+        audio_path=saved_path,
+        source="upload",
+        track_name=track_title,
+        identifier=file_hash,
+    )
 
     return SongJobResponse(
         job_id=task.id,
@@ -91,9 +101,14 @@ async def process_song_url(request: SongProcessRequest) -> SongJobResponse:
             detail="Se requiere 'youtube_url' cuando la fuente es 'youtube'",
         )
 
-    # Por ahora pasamos la URL como ruta hasta que el descargador de YouTube esté activo
     target = request.youtube_url or ""
-    task = process_song.delay(audio_path=target, source=request.source)
+    url_hash = SongRepository.normalize_youtube_url(target)
+
+    task = process_song.delay(
+        audio_path=target,
+        source=request.source,
+        identifier=url_hash,
+    )
 
     return SongJobResponse(
         job_id=task.id,

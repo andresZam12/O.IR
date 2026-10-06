@@ -15,6 +15,7 @@ from core.celery_app import celery_app
 from services.chord_service import ChordDetectionService
 from services.lyrics_service import LyricsService
 from services.difficulty_service import DifficultyService
+from repositories.song_repository import SongRepository
 
 
 @celery_app.task(bind=True, name="process_song")
@@ -24,6 +25,7 @@ def process_song(
     source: str,
     track_name: Optional[str] = None,
     artist_name: Optional[str] = None,
+    identifier: Optional[str] = None,
 ) -> dict:
     """
     Tarea principal: procesa un archivo de audio y extrae acordes + letra + dificultad.
@@ -86,7 +88,7 @@ def process_song(
         meta={"progress": 100, "step": "finalizando"}
     )
 
-    return {
+    final_result = {
         "status": "success",
         "audio_path": audio_path,
         "source": source,
@@ -98,3 +100,14 @@ def process_song(
         "lyrics": aligned_lyrics.model_dump(),
         "difficulty": difficulty_eval.model_dump(),
     }
+
+    # Guardar en repositorio de Supabase / caché si se proporcionó un identificador
+    if identifier:
+        try:
+            SongRepository().save(
+                identifier=identifier, source=source, result_data=final_result
+            )
+        except Exception:
+            pass
+
+    return final_result
