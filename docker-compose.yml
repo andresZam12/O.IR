@@ -1,0 +1,55 @@
+services:
+  # 1. Backend FastAPI (motor de audio y endpoints REST)
+  api:
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile
+    container_name: oir-api
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - ENVIRONMENT=production
+      - REDIS_URL=redis://redis:6379/0
+      - MAX_AUDIO_DURATION=300
+      - ALLOWED_ORIGINS=["http://localhost:3000", "http://localhost:3001"]
+    depends_on:
+      - redis
+    networks:
+      - oir-network
+
+  # 2. Redis (broker de mensajes para Celery y caché)
+  redis:
+    image: redis:7-alpine
+    container_name: oir-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - oir-network
+
+  # 3. Worker Celery (procesamiento intensivo en segundo plano)
+  worker:
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile
+    container_name: oir-worker
+    restart: unless-stopped
+    command: celery -A core.celery_app.celery_app worker --loglevel=info -c 2
+    environment:
+      - ENVIRONMENT=production
+      - REDIS_URL=redis://redis:6379/0
+      - MAX_AUDIO_DURATION=300
+    depends_on:
+      - redis
+    networks:
+      - oir-network
+
+networks:
+  oir-network:
+    driver: bridge
+
+volumes:
+  redis-data:
