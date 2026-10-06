@@ -4,6 +4,7 @@ routes/songs.py — Endpoints para el procesamiento y consulta de canciones
 
 import os
 import socket
+import tempfile
 import uuid
 from typing import Optional
 from urllib.parse import urlparse
@@ -82,6 +83,8 @@ def run_direct_process(
 
 
 ALLOWED_EXTENSIONS = {".mp3", ".wav", ".ogg", ".m4a", ".webm"}
+UPLOAD_DIR = os.path.join(tempfile.gettempdir(), "oir_uploads")
+os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 
 @router.post(
