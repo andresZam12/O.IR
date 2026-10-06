@@ -14,6 +14,7 @@ from typing import Optional
 from core.celery_app import celery_app
 from services.chord_service import ChordDetectionService
 from services.lyrics_service import LyricsService
+from services.difficulty_service import DifficultyService
 
 
 @celery_app.task(bind=True, name="process_song")
@@ -25,7 +26,7 @@ def process_song(
     artist_name: Optional[str] = None,
 ) -> dict:
     """
-    Tarea principal: procesa un archivo de audio y extrae acordes + letra.
+    Tarea principal: procesa un archivo de audio y extrae acordes + letra + dificultad.
 
     Args:
         audio_path: Ruta local al archivo de audio ya descargado/subido.
@@ -34,7 +35,7 @@ def process_song(
         artist_name: Nombre opcional del artista.
 
     Returns:
-        Diccionario con acordes, letra sincronizada, tonalidad y dificultad.
+        Diccionario con acordes, letra sincronizada, tonalidad y evaluación de dificultad.
     """
 
     # --- 1. Inicialización ---
@@ -72,11 +73,17 @@ def process_song(
         chords=chord_result.chords,
     )
 
-    # TODO Semana 6: importar y llamar a DifficultyService
+    # --- 4. Evaluación de dificultad objetiva y consejos pedagógicos ---
+    self.update_state(
+        state="STARTED",
+        meta={"progress": 85, "step": "evaluando_dificultad"}
+    )
+    difficulty_service = DifficultyService()
+    difficulty_eval = difficulty_service.evaluate_song(chord_result)
 
     self.update_state(
         state="STARTED",
-        meta={"progress": 95, "step": "finalizando"}
+        meta={"progress": 100, "step": "finalizando"}
     )
 
     return {
@@ -89,4 +96,5 @@ def process_song(
         "total_changes": chord_result.total_changes,
         "estimated_key": chord_result.estimated_key,
         "lyrics": aligned_lyrics.model_dump(),
+        "difficulty": difficulty_eval.model_dump(),
     }
