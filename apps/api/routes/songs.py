@@ -3,8 +3,10 @@ routes/songs.py — Endpoints para el procesamiento y consulta de canciones
 """
 
 import os
+import socket
 import uuid
 from typing import Optional
+from urllib.parse import urlparse
 import aiofiles
 from fastapi import APIRouter, BackgroundTasks, File, HTTPException, UploadFile, status
 from celery.result import AsyncResult
@@ -23,6 +25,18 @@ router = APIRouter()
 
 # Almacén de trabajos local para fallback cuando Redis no está activo
 local_jobs: dict[str, dict] = {}
+
+
+def is_redis_available() -> bool:
+    """Verifica de forma instantánea (timeout 200ms) si el servidor Redis está activo."""
+    try:
+        parsed = urlparse(settings.redis_url)
+        host = parsed.hostname or "localhost"
+        port = parsed.port or 6379
+        with socket.create_connection((host, port), timeout=0.2):
+            return True
+    except Exception:
+        return False
 
 
 def run_direct_process(
@@ -113,16 +127,22 @@ async def upload_audio_file(
     file_hash = SongRepository.generate_file_hash(saved_path)
     track_title = os.path.splitext(file.filename)[0]
 
-    # Intentar encolar en Celery; si Redis no está activo, usar BackgroundTasks
-    try:
-        task = process_song.delay(
-            audio_path=saved_path,
-            source="upload",
-            track_name=track_title,
-            identifier=file_hash,
-        )
-        job_id = task.id
-    except Exception:
+    # Despachar a Celery si Redis está activo; de lo contrario, ejecutar localmente
+    if is_redis_available():
+        try:
+            task = process_song.delay(
+                audio_path=saved_path,
+                source="upload",
+                track_name=track_title,
+                identifier=file_hash,
+            )
+            job_id = task.id
+        except Exception:
+            job_id = None
+    else:
+        job_id = None
+
+    if not job_id:
         job_id = str(uuid.uuid4())
         local_jobs[job_id] = {"status": "STARTED", "progress": 10, "step": "iniciando"}
         background_tasks.add_task(
@@ -165,15 +185,21 @@ async def process_song_url(
     target = request.youtube_url or ""
     url_hash = SongRepository.normalize_youtube_url(target)
 
-    # Intentar encolar en Celery; si Redis no está activo, usar BackgroundTasks
-    try:
-        task = process_song.delay(
-            audio_path=target,
-            source=request.source,
-            identifier=url_hash,
-        )
-        job_id = task.id
-    except Exception:
+    # Despachar a Celery si Redis está activo; de lo contrario, ejecutar localmente
+    if is_redis_available():
+        try:
+            task = process_song.delay(
+                audio_path=target,
+                source=request.source,
+                identifier=url_hash,
+            )
+            job_id = task.id
+        except Exception:
+            job_id = None
+    else:
+        job_id = None
+
+    if not job_id:
         job_id = str(uuid.uuid4())
         local_jobs[job_id] = {"status": "STARTED", "progress": 10, "step": "iniciando"}
         background_tasks.add_task(
@@ -215,49 +241,57 @@ async def get_job_status(job_id: str) -> SongJobStatus:
             error=info.get("error"),
         )
 
-    # 2. Si se ejecutó a través de Celery + Redis
-    task_result = AsyncResult(job_id, app=celery_app)
-    state = task_result.state
+    # 2. Si Redis está activo, consultar Celery
+    if is_redis_available():
+        task_result = AsyncResult(job_id, app=celery_app)
+        state = task_result.state
 
-    if state == "PENDING":
+        if state == "PENDING":
+            return SongJobStatus(
+                job_id=job_id,
+                status="PENDING",
+                progress=0,
+                step="en_cola",
+            )
+
+        elif state == "STARTED":
+            meta = task_result.info if isinstance(task_result.info, dict) else {}
+            return SongJobStatus(
+                job_id=job_id,
+                status="STARTED",
+                progress=meta.get("progress", 25),
+                step=meta.get("step", "procesando"),
+            )
+
+        elif state == "SUCCESS":
+            return SongJobStatus(
+                job_id=job_id,
+                status="SUCCESS",
+                progress=100,
+                step="completado",
+                result=task_result.result,
+            )
+
+        elif state == "FAILURE":
+            return SongJobStatus(
+                job_id=job_id,
+                status="FAILURE",
+                progress=0,
+                step="error",
+                error=str(task_result.info),
+            )
+
         return SongJobStatus(
             job_id=job_id,
-            status="PENDING",
-            progress=0,
-            step="en_cola",
+            status=state,
+            progress=50,
+            step=state.lower(),
         )
 
-    elif state == "STARTED":
-        meta = task_result.info if isinstance(task_result.info, dict) else {}
-        return SongJobStatus(
-            job_id=job_id,
-            status="STARTED",
-            progress=meta.get("progress", 25),
-            step=meta.get("step", "procesando"),
-        )
-
-    elif state == "SUCCESS":
-        return SongJobStatus(
-            job_id=job_id,
-            status="SUCCESS",
-            progress=100,
-            step="completado",
-            result=task_result.result,
-        )
-
-    elif state == "FAILURE":
-        return SongJobStatus(
-            job_id=job_id,
-            status="FAILURE",
-            progress=0,
-            step="error",
-            error=str(task_result.info),
-        )
-
-    # Otros estados como RETRY
     return SongJobStatus(
         job_id=job_id,
-        status=state,
-        progress=50,
-        step=state.lower(),
+        status="FAILURE",
+        progress=0,
+        step="error",
+        error="Tarea no encontrada",
     )
