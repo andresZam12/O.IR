@@ -33,7 +33,7 @@ class Settings(BaseSettings):
     environment: str = "development"
 
     # --- CORS ---
-    allowed_origins: list[str] = ["http://localhost:3000"]
+    allowed_origins: list[str] = ["http://localhost:3000", "http://localhost:3001"]
 
     # Indicar que las variables se cargan desde el archivo .env
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
