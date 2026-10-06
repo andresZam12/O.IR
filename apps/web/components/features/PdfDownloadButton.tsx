@@ -38,12 +38,8 @@ export default function PdfDownloadButton({ data }: PdfDownloadButtonProps) {
       fileName={`OIR_${songTitle}.pdf`}
       className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold py-2 px-4 rounded-lg transition-colors inline-flex items-center gap-1.5 shadow-md shadow-indigo-950"
     >
-      {({ loading }) => (
-        <>
-          <span>📄</span>
-          <span>{loading ? "Generando documento..." : "Exportar Cancionero PDF"}</span>
-        </>
-      )}
+      <span>📄</span>
+      <span>Exportar Cancionero PDF</span>
     </PDFDownloadLink>
   );
 }
