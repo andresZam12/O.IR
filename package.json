@@ -1,0 +1,12 @@
+{
+  "name": "oir-monorepo",
+  "version": "0.1.0",
+  "private": true,
+  "description": "O.IR - Plataforma web para deteccion de acordes y sincronizacion de letras",
+  "scripts": {
+    "dev": "npm --prefix apps/web run dev",
+    "build": "npm --prefix apps/web run build",
+    "start": "npm --prefix apps/web run start",
+    "lint": "npm --prefix apps/web run lint"
+  }
+}
