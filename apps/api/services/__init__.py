@@ -8,5 +8,11 @@ obtención de letra, cálculo de dificultad, etc.
 from services.chord_service import ChordDetectionService
 from services.lyrics_service import LyricsService
 from services.difficulty_service import DifficultyService
+from services.audio_service import AudioService
 
-__all__ = ["ChordDetectionService", "LyricsService", "DifficultyService"]
+__all__ = [
+    "ChordDetectionService",
+    "LyricsService",
+    "DifficultyService",
+    "AudioService",
+]
