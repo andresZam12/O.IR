@@ -19,7 +19,7 @@ from schemas.song import (
     SongProcessRequest,
 )
 from repositories.song_repository import SongRepository
-from workers.song_worker import process_song
+from workers.song_worker import execute_song_pipeline, process_song
 
 router = APIRouter()
 
@@ -58,8 +58,8 @@ def run_direct_process(
     try:
         local_jobs[job_id] = {"status": "STARTED", "progress": 10, "step": "iniciando"}
         fake_task = TaskContext()
-        res = process_song(
-            fake_task,
+        res = execute_song_pipeline(
+            task_context=fake_task,
             audio_path=audio_path,
             source=source,
             track_name=track_name,
