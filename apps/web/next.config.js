@@ -8,6 +8,7 @@ const nextConfig = {
         hostname: "img.youtube.com", // Miniaturas de YouTube
       },
     ],
+  },
   // Tolerancia de construcción en CI/CD para librerías con tipos externos
   typescript: {
     ignoreBuildErrors: true,
