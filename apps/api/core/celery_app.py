@@ -34,6 +34,14 @@ celery_app.conf.update(
     # Tiempo máximo que una tarea puede correr antes de cancelarse (10 minutos)
     task_time_limit=600,
 
+    # Timeout de conexión al broker para evitar bloqueos si Redis no está activo
+    broker_connection_retry_on_startup=False,
+    broker_connection_max_retries=1,
+    broker_transport_options={
+        "socket_timeout": 1.0,
+        "socket_connect_timeout": 1.0,
+    },
+
     # Lista de módulos donde Celery buscará las tareas registradas
     include=["workers.song_worker"],
 )
