@@ -47,7 +47,7 @@ def execute_song_pipeline(
     is_temp_download = False
 
     if source == "youtube":
-        self.update_state(
+        task_context.update_state(
             state="STARTED",
             meta={"progress": 15, "step": "descargando_audio"}
         )
@@ -59,7 +59,7 @@ def execute_song_pipeline(
         is_temp_download = True
 
     # --- 2. Detección de acordes con librosa ---
-    self.update_state(
+    task_context.update_state(
         state="STARTED",
         meta={"progress": 35, "step": "detectando_acordes"}
     )
@@ -67,7 +67,7 @@ def execute_song_pipeline(
     chord_result = chord_service.detect_chords_from_file(effective_audio_path)
 
     # --- 3. Obtención y sincronización de letra con LRCLIB ---
-    self.update_state(
+    task_context.update_state(
         state="STARTED",
         meta={"progress": 65, "step": "sincronizando_letras"}
     )
@@ -92,14 +92,14 @@ def execute_song_pipeline(
     )
 
     # --- 4. Evaluación de dificultad objetiva y consejos pedagógicos ---
-    self.update_state(
+    task_context.update_state(
         state="STARTED",
         meta={"progress": 85, "step": "evaluando_dificultad"}
     )
     difficulty_service = DifficultyService()
     difficulty_eval = difficulty_service.evaluate_song(chord_result)
 
-    self.update_state(
+    task_context.update_state(
         state="STARTED",
         meta={"progress": 100, "step": "finalizando"}
     )
