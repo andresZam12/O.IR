@@ -127,6 +127,9 @@ def process_song(
             SongRepository().save(
                 identifier=identifier, source=source, result_data=final_result
             )
+        except Exception as e:
+            logger.warning(f"No se pudo guardar en caché/repositorio: {e}")
+
     # Limpieza de archivo temporal si fue descargado de YouTube
     if is_temp_download and 'audio_service' in locals():
         audio_service.cleanup_file(effective_audio_path)
