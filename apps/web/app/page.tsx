@@ -1,11 +1,12 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import SongInputForm from "@/components/features/SongInputForm";
 import ProcessingProgress from "@/components/features/ProcessingProgress";
 import KaraokeView from "@/components/features/KaraokeView";
 import DifficultyCard from "@/components/features/DifficultyCard";
 import PdfDownloadButton from "@/components/features/PdfDownloadButton";
+import TransposerControl from "@/components/features/TransposerControl";
 import { pollJobUntilComplete } from "@/services/api";
 import { ProcessedSongResult, SongJobStatus } from "@/types/song";
 
@@ -16,12 +17,24 @@ export default function HomePage() {
     null
   );
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [transposeMap, setTransposeMap] = useState<Record<string, string>>({});
+
+  // Acordes actualizados en tiempo real según la transposición elegida
+  const displayChords = useMemo(() => {
+    if (!processedData?.chords) return [];
+    if (Object.keys(transposeMap).length === 0) return processedData.chords;
+    return processedData.chords.map((c) => ({
+      ...c,
+      chord: transposeMap[c.chord] || c.chord,
+    }));
+  }, [processedData?.chords, transposeMap]);
 
   // Iniciar flujo de procesamiento y polling continuo
   const handleJobStarted = async (id: string) => {
     setJobId(id);
     setErrorMessage(null);
     setProcessedData(null);
+    setTransposeMap({});
     setJobStatus({ job_id: id, status: "STARTED", progress: 5, step: "iniciando" });
 
     try {
@@ -43,6 +56,7 @@ export default function HomePage() {
     setJobStatus(null);
     setProcessedData(null);
     setErrorMessage(null);
+    setTransposeMap({});
   };
 
   return (
@@ -137,9 +151,17 @@ export default function HomePage() {
             <DifficultyCard evaluation={processedData.difficulty} />
           )}
 
-          {/* Vista Karaoke interactiva */}
+          {/* Control de Transposición cromática y Sugerencia de Capo */}
+          {processedData.unique_chords && processedData.unique_chords.length > 0 && (
+            <TransposerControl
+              originalChords={processedData.unique_chords}
+              onTransposeChange={(mapping) => setTransposeMap(mapping)}
+            />
+          )}
+
+          {/* Vista Karaoke interactiva con acordes dinámicos */}
           <KaraokeView
-            chords={processedData.chords}
+            chords={displayChords}
             lyrics={processedData.lyrics}
             duration={processedData.duration}
             estimatedKey={processedData.estimated_key}
