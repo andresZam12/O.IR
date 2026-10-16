@@ -122,3 +122,40 @@ export async function pollJobUntilComplete(
     check();
   });
 }
+
+export interface CapoRecommendation {
+  fret: number;
+  transposed_shapes: string[];
+  difficulty_reduction: number;
+  explanation: string;
+}
+
+export interface TransposeResponse {
+  semitones: number;
+  original_chords: string[];
+  transposed_chords: string[];
+  capo_suggestion?: CapoRecommendation | null;
+}
+
+/**
+ * Transpone una lista de acordes y obtiene recomendaciones inteligentes de Capo.
+ */
+export async function transposeChords(
+  chords: string[],
+  semitones: number
+): Promise<TransposeResponse> {
+  const response = await fetch(`${API_BASE_URL}/api/songs/transpose`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ chords, semitones }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.detail || "Error al transponer acordes");
+  }
+
+  return response.json();
+}
