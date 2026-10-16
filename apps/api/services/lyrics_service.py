@@ -314,42 +314,11 @@ class LyricsService:
             return lyrics
 
         if not lyrics.lines:
-            # Estructurar la progresión musical en frases y estrofas completas de inicio a fin
-            generated_lines: list[LyricLine] = []
-            section_names = [
-                "Intro",
-                "Estrofa 1",
-                "Estrofa 2",
-                "Coro",
-                "Puente Musical",
-                "Estrofa 3",
-                "Coro Final",
-                "Outro",
-            ]
-            step = 2  # Agrupar cada 2 acordes en una frase musical
-            sec_idx = 0
-
-            for i in range(0, len(chords), step):
-                chunk = chords[i : i + step]
-                start_t = chunk[0].time
-                current_sec = section_names[sec_idx % len(section_names)]
-                if i > 0 and i % (step * 2) == 0:
-                    sec_idx += 1
-
-                phrase_text = f"[{current_sec}]  {'    '.join(c.chord for c in chunk)}"
-                generated_lines.append(
-                    LyricLine(
-                        time=start_t,
-                        text=phrase_text,
-                        chord=chunk[0].chord,
-                    )
-                )
-
             return LyricsResult(
-                is_synced=True,
-                source="auto_musical_structure",
-                lines=generated_lines,
-                plain_lyrics="\n".join(l.text for l in generated_lines),
+                is_synced=False,
+                source="not_found",
+                lines=[],
+                plain_lyrics=None,
                 title=lyrics.title,
                 artist=lyrics.artist,
             )

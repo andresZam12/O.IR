@@ -77,25 +77,25 @@ def run_direct_process(
             fake_task = TaskContext()
             res = execute_song_pipeline(
                 task_context=fake_task,
-            audio_path=audio_path,
-            source=source,
-            track_name=track_name,
-            artist_name=artist_name,
-            identifier=identifier,
-        )
-        local_jobs[job_id] = {
-            "status": "SUCCESS",
-            "progress": 100,
-            "step": "completado",
-            "result": res,
-        }
-    except Exception as e:
-        local_jobs[job_id] = {
-            "status": "FAILURE",
-            "progress": 0,
-            "step": "error",
-            "error": str(e),
-        }
+                audio_path=audio_path,
+                source=source,
+                track_name=track_name,
+                artist_name=artist_name,
+                identifier=identifier,
+            )
+            local_jobs[job_id] = {
+                "status": "SUCCESS",
+                "progress": 100,
+                "step": "completado",
+                "result": res,
+            }
+        except Exception as e:
+            local_jobs[job_id] = {
+                "status": "FAILURE",
+                "progress": 0,
+                "step": "error",
+                "error": str(e),
+            }
 
 
 ALLOWED_EXTENSIONS = {".mp3", ".wav", ".ogg", ".m4a", ".webm"}
@@ -147,13 +147,25 @@ async def upload_audio_file(
 
     file_hash = SongRepository.generate_file_hash(saved_path)
     effective_title = (
-        track_title.strip()
-        if track_title and track_title.strip()
-        else os.path.splitext(file.filename)[0]
+        track_title.strip() if track_title and track_title.strip() else None
     )
     effective_artist = (
         artist_name.strip() if artist_name and artist_name.strip() else None
     )
+
+    # Extraer metadatos ID3 / Vorbis incrustados directamente en el archivo
+    try:
+        from tinytag import TinyTag
+        tag = TinyTag.get(saved_path)
+        if not effective_title and tag.title and tag.title.strip():
+            effective_title = tag.title.strip()
+        if not effective_artist and tag.artist and tag.artist.strip():
+            effective_artist = tag.artist.strip()
+    except Exception:
+        pass
+
+    if not effective_title:
+        effective_title = os.path.splitext(file.filename)[0]
 
     # Despachar a Celery si Redis está activo; de lo contrario, ejecutar localmente
     if is_redis_available():
@@ -382,3 +394,35 @@ async def transpose_chords_endpoint(request: TransposeRequest) -> TransposeRespo
     """
     service = TranspositionService()
     return service.transpose_chords(request.chords, request.semitones)
+
+
+from pydantic import BaseModel
+from schemas.lyrics import LyricsResult
+from services.lyrics_service import LyricsService
+
+
+class SyncLyricsRequest(BaseModel):
+    track_name: str
+    artist_name: Optional[str] = None
+    duration: float
+    chords: list[ChordItem]
+
+
+@router.post(
+    "/sync-lyrics",
+    response_model=LyricsResult,
+    summary="Buscar y sincronizar letra con acordes existentes en tiempo real",
+)
+async def sync_lyrics_endpoint(request: SyncLyricsRequest) -> LyricsResult:
+    """
+    Permite asociar y sincronizar dinámicamente la letra de una canción con
+    la progresión de acordes ya analizada, sin necesidad de re-procesar el audio.
+    """
+    service = LyricsService()
+    lyrics_result = await service.fetch_lyrics_lrclib(
+        track_name=request.track_name,
+        artist_name=request.artist_name,
+        duration=request.duration,
+    )
+    aligned = service.align_chords_with_lyrics(lyrics_result, request.chords)
+    return aligned

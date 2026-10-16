@@ -19,6 +19,7 @@ librosa>=0.10.2
 numpy>=2.0.0
 soundfile>=0.12.1
 ffmpeg-python>=0.2.0
+tinytag>=2.0.0
 
 # --- Descarga de audio desde YouTube ---
 yt-dlp>=2024.5.27
