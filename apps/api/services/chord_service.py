@@ -123,6 +123,14 @@ class ChordDetectionService:
             y=audio, sr=sample_rate, hop_length=self.hop_length
         )
 
+        # Suavizado armónico temporal: filtra fluctuaciones rápidas de percusión/voz (ventana ~1.8s)
+        try:
+            from scipy.ndimage import median_filter
+            if chromagram.shape[1] >= 5:
+                chromagram = median_filter(chromagram, size=(1, 5))
+        except Exception:
+            pass
+
         # 3. Vector de tiempos para cada ventana analizada
         times = librosa.frames_to_time(
             np.arange(chromagram.shape[1]), sr=sample_rate, hop_length=self.hop_length
@@ -159,8 +167,8 @@ class ChordDetectionService:
                 )
             )
 
-        # 5. Comprimir acordes consecutivos repetidos
-        compressed_chords = self._compress_chord_sequence(raw_chords)
+        # 5. Comprimir acordes consecutivos repetidos con umbral mínimo de duración musical
+        compressed_chords = self._compress_chord_sequence(raw_chords, min_duration_s=1.0)
 
         # 6. Acordes únicos encontrados
         unique_chords = sorted(
@@ -178,21 +186,55 @@ class ChordDetectionService:
             estimated_key=estimated_key,
         )
 
-    def _compress_chord_sequence(self, chords: list[ChordItem]) -> list[ChordItem]:
+    def _compress_chord_sequence(
+        self, chords: list[ChordItem], min_duration_s: float = 1.0
+    ) -> list[ChordItem]:
         """
-        Elimina redundancias consecutivas: si un acorde se mantiene en varios
-        frames consecutivos, solo se conserva el inicio del cambio de acorde.
+        Elimina redundancias consecutivas y filtra micro-transitorios (cambios menores a 1s)
+        para asegurar un ritmo armónico musicalmente coherente.
         """
         if not chords:
             return []
 
-        compressed: list[ChordItem] = [chords[0]]
+        # Agrupar bloques de acordes idénticos con su duración
+        blocks: list[dict] = []
+        for c in chords:
+            if not blocks or blocks[-1]["chord"] != c.chord:
+                blocks.append({
+                    "chord": c.chord,
+                    "start_time": c.time,
+                    "end_time": c.time,
+                    "conf": c.confidence,
+                })
+            else:
+                blocks[-1]["end_time"] = c.time
+                blocks[-1]["conf"] = max(blocks[-1]["conf"], c.confidence)
 
-        for chord in chords[1:]:
-            if chord.chord != compressed[-1].chord:
-                compressed.append(chord)
+        # Conservar solo bloques que duren al menos min_duration_s (o fusionar si son muy breves)
+        smoothed: list[ChordItem] = []
+        for b in blocks:
+            duration = b["end_time"] - b["start_time"]
+            if duration >= min_duration_s or len(blocks) <= 2:
+                if not smoothed or smoothed[-1].chord != b["chord"]:
+                    smoothed.append(
+                        ChordItem(
+                            time=b["start_time"],
+                            chord=b["chord"],
+                            confidence=b["conf"],
+                        )
+                    )
+            else:
+                # Transitorio muy breve: si es el primero, lo agregamos; si no, el acorde anterior se mantiene
+                if not smoothed:
+                    smoothed.append(
+                        ChordItem(
+                            time=b["start_time"],
+                            chord=b["chord"],
+                            confidence=b["conf"],
+                        )
+                    )
 
-        return compressed
+        return smoothed if smoothed else [chords[0]]
 
     def _estimate_key(self, chromagram: np.ndarray) -> Optional[str]:
         """
