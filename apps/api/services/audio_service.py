@@ -6,6 +6,7 @@ extracción de metadatos (título, artista, duración) y validación de límites
 """
 
 import os
+import re
 import uuid
 from typing import Optional
 from dataclasses import dataclass
@@ -65,11 +66,20 @@ class AudioService:
         unique_id = str(uuid.uuid4())
         output_template = os.path.join(self.DOWNLOAD_DIR, f"{unique_id}.%(ext)s")
 
+        # Limpiar la URL para asegurar que solo se descargue el video individual (descartar playlists y mixes automáticos)
+        clean_url = youtube_url.strip()
+        match = re.search(r"(?:v=|\/embed\/|\.be\/)([\w\-]{11})", clean_url)
+        if match:
+            clean_url = f"https://www.youtube.com/watch?v={match.group(1)}"
+
         ydl_opts = {
             "format": "ba[ext=m4a]/ba/b/bestaudio/best",
             "outtmpl": output_template,
             "quiet": True,
             "no_warnings": True,
+            "noplaylist": True,
+            "socket_timeout": 15,
+            "retries": 3,
             "extractor_args": {
                 "youtube": {
                     "player_client": ["mweb", "android", "web"],
@@ -89,7 +99,7 @@ class AudioService:
 
         try:
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                info = ydl.extract_info(youtube_url, download=True)
+                info = ydl.extract_info(clean_url, download=True)
                 if info is None:
                     raise RuntimeError("No se pudo extraer información del video.")
 
