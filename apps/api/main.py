@@ -21,12 +21,11 @@ app = FastAPI(
 )
 
 # --- Configuración de CORS ---
-# Permite que el frontend (Next.js en local o en Vercel) se comunique con esta API
+# Permite que el frontend (Next.js en local o cualquier despliegue en Vercel) se comunique sin bloqueos
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.allowed_origins,
-    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$|^https://.*\.vercel\.app$",
-    allow_credentials=True,
+    allow_origins=["*"],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
