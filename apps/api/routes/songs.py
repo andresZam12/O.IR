@@ -18,6 +18,7 @@ from fastapi import (
     UploadFile,
     status,
 )
+from fastapi.responses import FileResponse
 from celery.result import AsyncResult
 
 from core.celery_app import celery_app
@@ -322,6 +323,50 @@ async def get_job_status(job_id: str) -> SongJobStatus:
         progress=0,
         step="error",
         error="Tarea no encontrada",
+    )
+
+
+@router.get(
+    "/stream/{job_id}",
+    summary="Obtener stream de audio del archivo analizado",
+)
+async def stream_audio_file(job_id: str):
+    """
+    Transmite el archivo de audio para su reproducción sincronizada
+    en la vista de Karaoke Interactivo.
+    """
+    audio_path = None
+    if job_id in local_jobs:
+        job = local_jobs[job_id]
+        res = job.get("result")
+        if res and isinstance(res, dict):
+            audio_path = res.get("audio_path")
+
+    if not audio_path or not os.path.exists(audio_path):
+        for ext in ALLOWED_EXTENSIONS:
+            candidate = os.path.join(UPLOAD_DIR, f"{job_id}{ext}")
+            if os.path.exists(candidate):
+                audio_path = candidate
+                break
+
+    if not audio_path or not os.path.exists(audio_path):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Archivo de audio no disponible para reproducción",
+        )
+
+    _, ext = os.path.splitext(audio_path.lower())
+    media_types = {
+        ".mp3": "audio/mpeg",
+        ".wav": "audio/wav",
+        ".ogg": "audio/ogg",
+        ".m4a": "audio/mp4",
+        ".webm": "audio/webm",
+    }
+    return FileResponse(
+        path=audio_path,
+        media_type=media_types.get(ext, "audio/mpeg"),
+        filename=os.path.basename(audio_path),
     )
 
 

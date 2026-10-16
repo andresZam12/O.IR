@@ -120,6 +120,7 @@ def execute_song_pipeline(
         "estimated_key": chord_result.estimated_key,
         "lyrics": aligned_lyrics.model_dump(),
         "difficulty": difficulty_eval.model_dump(),
+        "audio_url": f"/songs/stream/{identifier}" if identifier else None,
     }
 
     # Guardar en repositorio de Supabase / caché si se proporcionó un identificador
@@ -130,10 +131,6 @@ def execute_song_pipeline(
             )
         except Exception as e:
             logger.warning(f"No se pudo guardar en caché/repositorio: {e}")
-
-    # Limpieza de archivo temporal si fue descargado de YouTube
-    if is_temp_download and 'audio_service' in locals():
-        audio_service.cleanup_file(effective_audio_path)
 
     return final_result
 

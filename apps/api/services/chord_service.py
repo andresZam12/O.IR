@@ -123,10 +123,12 @@ class ChordDetectionService:
             y=audio, sr=sample_rate, hop_length=self.hop_length
         )
 
-        # Suavizado armónico temporal: filtra fluctuaciones rápidas de percusión/voz (ventana ~1.8s)
+        # Suavizado armónico temporal optimizado para principiantes: filtra transitorios rápidos (ventana ~2.5s)
         try:
             from scipy.ndimage import median_filter
-            if chromagram.shape[1] >= 5:
+            if chromagram.shape[1] >= 7:
+                chromagram = median_filter(chromagram, size=(1, 7))
+            elif chromagram.shape[1] >= 5:
                 chromagram = median_filter(chromagram, size=(1, 5))
         except Exception:
             pass
@@ -167,8 +169,8 @@ class ChordDetectionService:
                 )
             )
 
-        # 5. Comprimir acordes consecutivos repetidos con umbral mínimo de duración musical
-        compressed_chords = self._compress_chord_sequence(raw_chords, min_duration_s=1.0)
+        # 5. Comprimir y simplificar progresión para principiantes (mínimo 2.2s por acorde)
+        compressed_chords = self._compress_chord_sequence(raw_chords, min_duration_s=2.2)
 
         # 6. Acordes únicos encontrados
         unique_chords = sorted(
@@ -187,16 +189,16 @@ class ChordDetectionService:
         )
 
     def _compress_chord_sequence(
-        self, chords: list[ChordItem], min_duration_s: float = 1.0
+        self, chords: list[ChordItem], min_duration_s: float = 2.2
     ) -> list[ChordItem]:
         """
-        Elimina redundancias consecutivas y filtra micro-transitorios (cambios menores a 1s)
-        para asegurar un ritmo armónico musicalmente coherente.
+        Elimina redundancias consecutivas, filtra micro-transitorios y simplifica la progresión
+        a bloques armónicos estables y accesibles para músicos principiantes (mínimo ~2.2 segundos por acorde).
         """
         if not chords:
             return []
 
-        # Agrupar bloques de acordes idénticos con su duración
+        # 1. Agrupar bloques de acordes idénticos con su duración
         blocks: list[dict] = []
         for c in chords:
             if not blocks or blocks[-1]["chord"] != c.chord:
@@ -210,31 +212,69 @@ class ChordDetectionService:
                 blocks[-1]["end_time"] = c.time
                 blocks[-1]["conf"] = max(blocks[-1]["conf"], c.confidence)
 
-        # Conservar solo bloques que duren al menos min_duration_s (o fusionar si son muy breves)
-        smoothed: list[ChordItem] = []
-        for b in blocks:
-            duration = b["end_time"] - b["start_time"]
-            if duration >= min_duration_s or len(blocks) <= 2:
-                if not smoothed or smoothed[-1].chord != b["chord"]:
-                    smoothed.append(
-                        ChordItem(
-                            time=b["start_time"],
-                            chord=b["chord"],
-                            confidence=b["conf"],
-                        )
-                    )
-            else:
-                # Transitorio muy breve: si es el primero, lo agregamos; si no, el acorde anterior se mantiene
-                if not smoothed:
-                    smoothed.append(
-                        ChordItem(
-                            time=b["start_time"],
-                            chord=b["chord"],
-                            confidence=b["conf"],
-                        )
-                    )
+        if not blocks:
+            return []
 
-        return smoothed if smoothed else [chords[0]]
+        # 2. Simplificación iterativa para principiantes: fusionar acordes fugaces (< min_duration_s)
+        # en el acorde dominante vecino más largo o con mayor confianza
+        merged_blocks = [dict(b) for b in blocks]
+        changed = True
+        iterations = 0
+
+        while changed and iterations < 5:
+            changed = False
+            iterations += 1
+            new_blocks: list[dict] = []
+            i = 0
+            while i < len(merged_blocks):
+                curr = merged_blocks[i]
+                dur = curr["end_time"] - curr["start_time"]
+
+                # Si el bloque es fugaz (< min_duration_s) y hay más acordes en la canción
+                if dur < min_duration_s and len(merged_blocks) > 2:
+                    changed = True
+                    # Decidir si anexar al acorde anterior o al siguiente
+                    if new_blocks and (i + 1 < len(merged_blocks)):
+                        prev_dur = new_blocks[-1]["end_time"] - new_blocks[-1]["start_time"]
+                        next_dur = merged_blocks[i + 1]["end_time"] - merged_blocks[i + 1]["start_time"]
+                        if prev_dur >= next_dur:
+                            new_blocks[-1]["end_time"] = curr["end_time"]
+                        else:
+                            merged_blocks[i + 1]["start_time"] = curr["start_time"]
+                    elif new_blocks:
+                        new_blocks[-1]["end_time"] = curr["end_time"]
+                    elif i + 1 < len(merged_blocks):
+                        merged_blocks[i + 1]["start_time"] = curr["start_time"]
+                    else:
+                        new_blocks.append(curr)
+                else:
+                    new_blocks.append(curr)
+                i += 1
+
+            # Combinar adyacentes que hayan quedado con el mismo acorde
+            consolidated: list[dict] = []
+            for b in new_blocks:
+                if not consolidated or consolidated[-1]["chord"] != b["chord"]:
+                    consolidated.append(b)
+                else:
+                    consolidated[-1]["end_time"] = b["end_time"]
+                    consolidated[-1]["conf"] = max(consolidated[-1]["conf"], b["conf"])
+
+            merged_blocks = consolidated
+
+        # 3. Mapear a ChordItem final
+        result: list[ChordItem] = []
+        for b in merged_blocks:
+            if not result or result[-1].chord != b["chord"]:
+                result.append(
+                    ChordItem(
+                        time=round(b["start_time"], 2),
+                        chord=b["chord"],
+                        confidence=round(b["conf"], 3),
+                    )
+                )
+
+        return result if result else [chords[0]]
 
     def _estimate_key(self, chromagram: np.ndarray) -> Optional[str]:
         """
