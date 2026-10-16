@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import { ChordItem, LyricsResult } from "@/types/song";
+import { syncLyrics } from "@/services/api";
 
 interface ChordSheetViewProps {
   title?: string;
@@ -10,6 +11,8 @@ interface ChordSheetViewProps {
   lyrics?: LyricsResult;
   estimatedKey?: string | null;
   transposeMap?: Record<string, string>;
+  duration?: number;
+  onLyricsSynced?: (lyrics: LyricsResult) => void;
 }
 
 interface FormattedLine {
@@ -25,7 +28,50 @@ export default function ChordSheetView({
   lyrics,
   estimatedKey,
   transposeMap = {},
+  duration = 180,
+  onLyricsSynced,
 }: ChordSheetViewProps) {
+  const [searchTitle, setSearchTitle] = useState(
+    title !== "Canción" && title !== "Audio Analizado" ? title : ""
+  );
+  const [searchArtist, setSearchArtist] = useState(
+    artist !== "Artista" && artist !== "Desconocido" ? artist : ""
+  );
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncError, setSyncError] = useState<string | null>(null);
+
+  const handleManualSync = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!searchTitle.trim()) return;
+
+    try {
+      setIsSyncing(true);
+      setSyncError(null);
+      const res = await syncLyrics(
+        searchTitle.trim(),
+        searchArtist.trim() || undefined,
+        duration,
+        chords
+      );
+
+      if (res && res.lines && res.lines.length > 0) {
+        if (onLyricsSynced) {
+          onLyricsSynced(res);
+        }
+      } else {
+        setSyncError(
+          "No se encontraron letras para este título en la base de datos abierta. Revisa la ortografía."
+        );
+      }
+    } catch (err: unknown) {
+      setSyncError(
+        err instanceof Error ? err.message : "Error al sincronizar la letra."
+      );
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
   // Transponer el acorde en tiempo real si el usuario aplicó Capo
   const getChordDisplay = (rawChord: string) => {
     return transposeMap[rawChord] || rawChord;
@@ -222,6 +268,54 @@ export default function ChordSheetView({
           🖨️ Imprimir Cancionero
         </button>
       </div>
+
+      {/* Caja de sincronización interactiva de letras si no vinieron en el audio */}
+      {(!lyrics?.lines || lyrics.lines.length === 0) && (
+        <div className="mt-6 mb-2 p-5 rounded-xl bg-gradient-to-r from-blue-950/70 via-indigo-950/60 to-slate-900 border border-blue-500/40 print:hidden shadow-lg shadow-blue-950/30">
+          <div className="flex items-start gap-3">
+            <span className="text-2xl mt-0.5">🎙️</span>
+            <div className="flex-1">
+              <h4 className="text-sm font-bold text-white">
+                Sincronización de Letra Completa con IA
+              </h4>
+              <p className="text-xs text-slate-300 mt-1 leading-relaxed">
+                Los acordes fueron extraídos con éxito ({chords.length} acordes detectados). 
+                Para superponer la letra completa palabra por palabra sobre cada acorde, ingresa el nombre de la canción:
+              </p>
+
+              <form onSubmit={handleManualSync} className="flex flex-col sm:flex-row gap-2.5 mt-3">
+                <input
+                  type="text"
+                  placeholder="Título de la canción (ej. De Música Ligera, Azabache)..."
+                  value={searchTitle}
+                  onChange={(e) => setSearchTitle(e.target.value)}
+                  className="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-3.5 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-400"
+                />
+                <input
+                  type="text"
+                  placeholder="Artista (opcional)..."
+                  value={searchArtist}
+                  onChange={(e) => setSearchArtist(e.target.value)}
+                  className="sm:w-56 bg-slate-950 border border-slate-700 rounded-lg px-3.5 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-400"
+                />
+                <button
+                  type="submit"
+                  disabled={isSyncing || !searchTitle.trim()}
+                  className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-bold text-xs px-5 py-2 rounded-lg transition-all shadow-md flex items-center justify-center gap-1.5 whitespace-nowrap"
+                >
+                  {isSyncing ? "Buscando..." : "Sincronizar Letra 🎵"}
+                </button>
+              </form>
+
+              {syncError && (
+                <p className="text-xs text-red-400 mt-2 font-medium">
+                  ⚠️ {syncError}
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Contenido completo de la canción de principio a fin */}
       <div className="my-8 font-mono text-sm leading-relaxed overflow-x-auto">

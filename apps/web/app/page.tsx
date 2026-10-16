@@ -198,6 +198,12 @@ export default function HomePage() {
               lyrics={processedData.lyrics}
               estimatedKey={processedData.estimated_key}
               transposeMap={transposeMap}
+              duration={processedData.duration}
+              onLyricsSynced={(newLyrics) =>
+                setProcessedData((prev) =>
+                  prev ? { ...prev, lyrics: newLyrics } : prev
+                )
+              }
             />
           ) : (
             <KaraokeView
