@@ -85,17 +85,17 @@ class LyricsService:
             r"\.(mp3|wav|ogg|m4a|webm|flac)$", "", title, flags=re.IGNORECASE
         ).strip()
 
-        # Quitar etiquetas tipo [Official Video], (Audio Oficial), etc.
+        # Quitar etiquetas tipo [Official Video], (Audio Oficial), (Visualizador Oficial), etc.
         noise_bracket_pattern = (
-            r"(\(|\[|\{)(?i:official|video|audio|lyric|lyrics|hd|4k|remastered|remaster|"
-            r"live|extended|version|visualizer|clip|feat\.?|ft\.?).*?(\)|\]|\})"
+            r"(\(|\[|\{)(?i:official|oficial|video|audio|lyric|lyrics|letra|hd|4k|remastered|remaster|"
+            r"live|en\s+vivo|extended|version|versión|visualizer|visualizador|clip|feat\.?|ft\.?).*?(\)|\]|\})"
         )
         title = re.sub(noise_bracket_pattern, "", title).strip()
 
         # Quitar prefijos como "OFFICIAL ", "Official Video - ", "Video Oficial:"
         prefix_pattern = (
             r"^(?i:official\s+music\s+video|official\s+video|official\s+audio|"
-            r"official\s+lyric\s+video|official|video\s+oficial|audio\s+oficial)\s*[:-]?"
+            r"official\s+lyric\s+video|official|video\s+oficial|audio\s+oficial|visualizador\s+oficial)\s*[:-]?"
         )
         title = re.sub(prefix_pattern, "", title).strip()
         title = title.strip("\"' ")
@@ -112,18 +112,32 @@ class LyricsService:
             part1 = title[: sep_match.start()].strip()
             part2 = title[sep_match.end() :].strip()
 
-            clean_track_name = part1
-            detected_artist = part2
+            # En el 90% de los casos en español (ej. "Ismael Rivera - Incomprendido"),
+            # part1 es el artista y part2 es la canción.
+            clean_track_name = part2
+            detected_artist = part1
 
             # Generar variantes de búsqueda prioritarias
-            queries.append(f"{part2} {part1}")
             queries.append(f"{part1} {part2}")
-            queries.append(part1)
+            queries.append(f"{part2} {part1}")
             queries.append(part2)
+            queries.append(part1)
+
+            # Variante sin corchetes o paréntesis residuales en part2
+            clean_part2 = re.sub(r"[\(\[\{].*?[\)\]\}]", "", part2).strip()
+            if clean_part2 and clean_part2 != part2:
+                queries.append(f"{part1} {clean_part2}")
+                queries.append(clean_part2)
         else:
             if artist:
                 queries.append(f"{artist} {title}")
             queries.append(title)
+            # Variante sin corchetes o paréntesis
+            no_brackets = re.sub(r"[\(\[\{].*?[\)\]\}]", "", title).strip()
+            if no_brackets and no_brackets != title:
+                if artist:
+                    queries.append(f"{artist} {no_brackets}")
+                queries.append(no_brackets)
 
         if artist and f"{artist} {clean_track_name}" not in queries:
             queries.insert(0, f"{artist} {clean_track_name}")
