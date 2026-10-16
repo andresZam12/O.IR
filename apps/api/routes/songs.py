@@ -26,8 +26,12 @@ from workers.song_worker import execute_song_pipeline, process_song
 
 router = APIRouter()
 
+import threading
+
 # Almacén de trabajos local para fallback cuando Redis no está activo
 local_jobs: dict[str, dict] = {}
+# Bloqueo para serializar el procesamiento de audio en entornos con memoria limitada (ej. Render 512MB)
+pipeline_lock = threading.Semaphore(1)
 
 
 def is_redis_available() -> bool:
@@ -58,11 +62,12 @@ def run_direct_process(
                 local_jobs[job_id]["progress"] = meta.get("progress", 50)
                 local_jobs[job_id]["step"] = meta.get("step", "procesando")
 
-    try:
-        local_jobs[job_id] = {"status": "STARTED", "progress": 10, "step": "iniciando"}
-        fake_task = TaskContext()
-        res = execute_song_pipeline(
-            task_context=fake_task,
+    with pipeline_lock:
+        try:
+            local_jobs[job_id] = {"status": "STARTED", "progress": 10, "step": "iniciando"}
+            fake_task = TaskContext()
+            res = execute_song_pipeline(
+                task_context=fake_task,
             audio_path=audio_path,
             source=source,
             track_name=track_name,

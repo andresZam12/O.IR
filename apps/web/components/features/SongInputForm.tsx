@@ -20,6 +20,7 @@ export default function SongInputForm({
   const [youtubeUrl, setYoutubeUrl] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Estados para grabación por micrófono
   const [isRecording, setIsRecording] = useState(false);
@@ -33,32 +34,38 @@ export default function SongInputForm({
   // Manejo de envío de YouTube
   const handleYoutubeSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!youtubeUrl.trim()) {
-      onError("Por favor ingresa una URL de YouTube");
+    if (!youtubeUrl.trim() || isSubmitting || isProcessing) {
+      if (!youtubeUrl.trim()) onError("Por favor ingresa una URL de YouTube");
       return;
     }
 
     try {
+      setIsSubmitting(true);
       const response = await processSongUrl(youtubeUrl.trim());
       onJobStarted(response.job_id);
     } catch (err: unknown) {
       onError(err instanceof Error ? err.message : "Error al procesar el enlace");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   // Manejo de envío de archivo
   const handleFileSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedFile) {
-      onError("Por favor selecciona un archivo de audio");
+    if (!selectedFile || isSubmitting || isProcessing) {
+      if (!selectedFile) onError("Por favor selecciona un archivo de audio");
       return;
     }
 
     try {
+      setIsSubmitting(true);
       const response = await uploadAudioFile(selectedFile);
       onJobStarted(response.job_id);
     } catch (err: unknown) {
       onError(err instanceof Error ? err.message : "Error al subir el archivo");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -247,10 +254,14 @@ export default function SongInputForm({
 
           <button
             type="submit"
-            disabled={isProcessing || !selectedFile}
+            disabled={isProcessing || isSubmitting || !selectedFile}
             className="w-full bg-primary-600 hover:bg-primary-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-3.5 px-6 rounded-xl transition-all shadow-lg shadow-primary-900/30 flex items-center justify-center gap-2"
           >
-            {isProcessing ? "Procesando audio..." : "Subir y Analizar 🚀"}
+            {isSubmitting
+              ? "Subiendo archivo..."
+              : isProcessing
+              ? "Procesando audio..."
+              : "Subir y Analizar 🚀"}
           </button>
         </form>
       )}

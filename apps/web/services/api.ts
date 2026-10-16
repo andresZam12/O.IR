@@ -106,7 +106,7 @@ export async function getJobStatus(jobId: string): Promise<SongJobStatus> {
 export async function pollJobUntilComplete(
   jobId: string,
   onProgress?: (status: SongJobStatus) => void,
-  intervalMs = 1500
+  intervalMs = 3000
 ): Promise<ProcessedSongResult> {
   return new Promise((resolve, reject) => {
     let consecutiveErrors = 0;
