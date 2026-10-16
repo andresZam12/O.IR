@@ -109,9 +109,14 @@ export async function pollJobUntilComplete(
   intervalMs = 1500
 ): Promise<ProcessedSongResult> {
   return new Promise((resolve, reject) => {
+    let consecutiveErrors = 0;
+    const maxErrors = 5;
+
     const check = async () => {
       try {
         const current = await getJobStatus(jobId);
+        consecutiveErrors = 0; // Resetear contador al obtener respuesta exitosa
+
         if (onProgress) {
           onProgress(current);
         }
@@ -137,7 +142,13 @@ export async function pollJobUntilComplete(
         // Continuar haciendo polling
         setTimeout(check, intervalMs);
       } catch (err) {
-        reject(err);
+        consecutiveErrors += 1;
+        if (consecutiveErrors >= maxErrors) {
+          reject(err);
+        } else {
+          // Reintentar tras un breve retraso por si el servidor estaba reiniciando
+          setTimeout(check, intervalMs * 1.5);
+        }
       }
     };
 
