@@ -72,30 +72,42 @@ class AudioService:
         if match:
             clean_url = f"https://www.youtube.com/watch?v={match.group(1)}"
 
+        # Soporte para cookies opcionales si se configuran en el servidor en la nube
+        cookie_path = os.getenv("YOUTUBE_COOKIE_PATH")
+        cookie_content = os.getenv("YOUTUBE_COOKIES")
+        if cookie_content and not cookie_path:
+            cookie_path = os.path.join(self.DOWNLOAD_DIR, "yt_cookies.txt")
+            try:
+                with open(cookie_path, "w", encoding="utf-8") as cf:
+                    cf.write(cookie_content)
+            except Exception:
+                pass
+
         ydl_opts = {
             "format": "ba[ext=m4a]/ba/b/bestaudio/best",
             "outtmpl": output_template,
             "quiet": True,
             "no_warnings": True,
             "noplaylist": True,
-            "socket_timeout": 15,
+            "socket_timeout": 25,
             "retries": 3,
             "extractor_args": {
                 "youtube": {
-                    "player_client": ["mweb", "android", "web"],
+                    "player_client": ["android", "ios"],
                 }
             },
             "http_headers": {
                 "User-Agent": (
-                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                    "AppleWebKit/537.36 (KHTML, like Gecko) "
-                    "Chrome/124.0.0.0 Safari/537.36"
+                    "com.google.android.youtube/19.09.37 (Linux; U; Android 14; US) gzip"
                 ),
                 "Accept-Language": "en-US,en;q=0.9",
             },
             # Evitar descargar videos excesivamente largos
             "max_filesize": 50 * 1024 * 1024,  # 50 MB
         }
+
+        if cookie_path and os.path.exists(cookie_path):
+            ydl_opts["cookiefile"] = cookie_path
 
         try:
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
