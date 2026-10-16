@@ -8,8 +8,13 @@ import {
   SongJobStatus,
 } from "@/types/song";
 
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const rawApiUrl =
+  process.env.NEXT_PUBLIC_API_URL ||
+  process.env.NEXTT_PUBLIC_API_URL ||
+  process.env.NEXT_PUBLIC_BACKEND_URL ||
+  "http://localhost:8000";
+
+const API_BASE_URL = rawApiUrl.replace(/\/+$/, "");
 
 function handleFetchError(err: unknown): never {
   if (err instanceof TypeError && err.message.toLowerCase().includes("failed to fetch")) {
