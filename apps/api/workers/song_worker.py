@@ -80,10 +80,15 @@ def execute_song_pipeline(
     lyrics_result = asyncio.run(
         lyrics_service.fetch_lyrics_lrclib(
             track_name=effective_title,
-            artist_name=artist_name,
+            artist_name=effective_artist,
             duration=chord_result.duration,
         )
     )
+
+    if lyrics_result.title:
+        effective_title = lyrics_result.title
+    if lyrics_result.artist:
+        effective_artist = lyrics_result.artist
 
     # Alinear acordes sobre cada línea de la letra para la vista karaoke
     aligned_lyrics = lyrics_service.align_chords_with_lyrics(

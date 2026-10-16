@@ -69,6 +69,77 @@ class LyricsService:
         lines.sort(key=lambda line: line.time)
         return lines
 
+    @staticmethod
+    def clean_title_and_artist(
+        raw_title: str, raw_artist: Optional[str] = None
+    ) -> tuple[str, Optional[str], list[str]]:
+        """
+        Limpia títulos procedentes de YouTube o nombres de archivo,
+        eliminando etiquetas publicitarias, formatos ('[Official Video]', '(HD)', etc.),
+        y detecta separadores para generar variantes de búsqueda optimizadas.
+        """
+        title = (raw_title or "").strip()
+
+        # Quitar extensiones de archivo si las tiene
+        title = re.sub(
+            r"\.(mp3|wav|ogg|m4a|webm|flac)$", "", title, flags=re.IGNORECASE
+        ).strip()
+
+        # Quitar etiquetas tipo [Official Video], (Audio Oficial), etc.
+        noise_bracket_pattern = (
+            r"(\(|\[|\{)(?i:official|video|audio|lyric|lyrics|hd|4k|remastered|remaster|"
+            r"live|extended|version|visualizer|clip|feat\.?|ft\.?).*?(\)|\]|\})"
+        )
+        title = re.sub(noise_bracket_pattern, "", title).strip()
+
+        # Quitar prefijos como "OFFICIAL ", "Official Video - ", "Video Oficial:"
+        prefix_pattern = (
+            r"^(?i:official\s+music\s+video|official\s+video|official\s+audio|"
+            r"official\s+lyric\s+video|official|video\s+oficial|audio\s+oficial)\s*[:-]?"
+        )
+        title = re.sub(prefix_pattern, "", title).strip()
+        title = title.strip("\"' ")
+
+        artist = (raw_artist or "").strip()
+        queries: list[str] = []
+
+        # Detectar separadores comunes en nombres de videos/archivos ("Artista - Canción" o "Canción - Artista")
+        sep_match = re.search(r"\s+[-–—|:]\s+", title)
+        detected_artist: Optional[str] = None
+        clean_track_name = title
+
+        if sep_match:
+            part1 = title[: sep_match.start()].strip()
+            part2 = title[sep_match.end() :].strip()
+
+            clean_track_name = part1
+            detected_artist = part2
+
+            # Generar variantes de búsqueda prioritarias
+            queries.append(f"{part2} {part1}")
+            queries.append(f"{part1} {part2}")
+            queries.append(part1)
+            queries.append(part2)
+        else:
+            if artist:
+                queries.append(f"{artist} {title}")
+            queries.append(title)
+
+        if artist and f"{artist} {clean_track_name}" not in queries:
+            queries.insert(0, f"{artist} {clean_track_name}")
+
+        # Desduplicar preservando orden
+        seen = set()
+        unique_queries = []
+        for q in queries:
+            norm_q = " ".join(q.split())
+            if norm_q and norm_q.lower() not in seen:
+                seen.add(norm_q.lower())
+                unique_queries.append(norm_q)
+
+        effective_artist = artist if artist else detected_artist
+        return clean_track_name, effective_artist, unique_queries
+
     async def fetch_lyrics_lrclib(
         self,
         track_name: str,
@@ -76,103 +147,144 @@ class LyricsService:
         duration: Optional[float] = None,
     ) -> LyricsResult:
         """
-        Consulta la API de LRCLIB buscando la letra sincronizada de una canción.
+        Consulta la API de LRCLIB buscando la letra sincronizada de una canción
+        mediante múltiples candidatos inteligentes y fallback a fuentes secundarias.
 
         Args:
-            track_name: Nombre o título de la canción.
+            track_name: Nombre o título de la canción (o título de video/archivo).
             artist_name: Nombre del artista o banda (opcional).
             duration: Duración estimada de la canción en segundos (opcional).
 
         Returns:
-            LyricsResult con las líneas sincronizadas o la letra plana.
+            LyricsResult con las líneas sincronizadas o la letra plana distribuida.
         """
-        params: dict[str, str | int] = {"track_name": track_name}
-        if artist_name:
-            params["artist_name"] = artist_name
-        if duration and duration > 0:
-            params["duration"] = int(round(duration))
+        clean_title, clean_artist, search_queries = self.clean_title_and_artist(
+            track_name, artist_name
+        )
+
+        headers = {
+            "User-Agent": "OIR-HarmonicRecognition/1.0 (https://o-ir.vercel.app)",
+            "Accept": "application/json",
+        }
 
         try:
-            async with httpx.AsyncClient(timeout=self.timeout) as client:
-                # 1. Intentar endpoint exacto /get
-                response = await client.get(f"{self.LRCLIB_BASE_URL}/get", params=params)
+            async with httpx.AsyncClient(timeout=self.timeout, headers=headers) as client:
+                # 1. Si tenemos título y artista claros, intentar coincidencia exacta /get
+                if clean_title and clean_artist:
+                    params: dict[str, str | int] = {
+                        "track_name": clean_title,
+                        "artist_name": clean_artist,
+                    }
+                    if duration and duration > 0:
+                        params["duration"] = int(round(duration))
 
-                if response.status_code == 200:
-                    data = response.json()
-                    synced_lrc = data.get("syncedLyrics")
-                    plain_lyrics = data.get("plainLyrics")
+                    try:
+                        res = await client.get(f"{self.LRCLIB_BASE_URL}/get", params=params)
+                        if res.status_code == 200:
+                            data = res.json()
+                            synced_lrc = data.get("syncedLyrics")
+                            plain_lyrics = data.get("plainLyrics")
+                            if synced_lrc:
+                                return LyricsResult(
+                                    is_synced=True,
+                                    source="lrclib",
+                                    lines=self.parse_lrc(synced_lrc),
+                                    plain_lyrics=plain_lyrics,
+                                    title=data.get("trackName") or clean_title,
+                                    artist=data.get("artistName") or clean_artist,
+                                )
+                    except Exception:
+                        pass
 
-                    if synced_lrc:
-                        parsed_lines = self.parse_lrc(synced_lrc)
-                        return LyricsResult(
-                            is_synced=True,
-                            source="lrclib",
-                            lines=parsed_lines,
-                            plain_lyrics=plain_lyrics,
-                            title=data.get("trackName"),
-                            artist=data.get("artistName"),
-                        )
-                    elif plain_lyrics:
-                        # Distribuir letras planas proporcionalmente a lo largo de la duración
-                        raw_lines = [l.strip() for l in plain_lyrics.splitlines() if l.strip()]
-                        total = len(raw_lines)
-                        if total > 0 and duration > 0:
-                            step = duration / total
-                            distributed_lines = [
-                                LyricLine(time=round(i * step, 2), text=text)
-                                for i, text in enumerate(raw_lines)
-                            ]
-                        else:
-                            distributed_lines = [LyricLine(time=0.0, text=t) for t in raw_lines]
-
-                        return LyricsResult(
-                            is_synced=True,
-                            source="lrclib",
-                            lines=distributed_lines,
-                            plain_lyrics=plain_lyrics,
-                            title=data.get("trackName"),
-                            artist=data.get("artistName"),
+                # 2. Iterar sobre los queries de búsqueda inteligentes
+                for query in search_queries:
+                    try:
+                        search_res = await client.get(
+                            f"{self.LRCLIB_BASE_URL}/search", params={"q": query}
                         )
 
-                # 2. Si no hubo coincidencia exacta, intentar búsqueda abierta /search
-                search_query = f"{artist_name} {track_name}".strip() if artist_name else track_name
-                search_response = await client.get(
-                    f"{self.LRCLIB_BASE_URL}/search", params={"q": search_query}
-                )
+                        # Reintentar brevemente si LRCLIB está sobrecargado (503)
+                        if search_res.status_code == 503:
+                            import asyncio
+                            await asyncio.sleep(0.4)
+                            search_res = await client.get(
+                                f"{self.LRCLIB_BASE_URL}/search", params={"q": query}
+                            )
 
-                if search_response.status_code == 200:
-                    items = search_response.json()
-                    if isinstance(items, list) and len(items) > 0:
-                        first_match = items[0]
-                        synced_lrc = first_match.get("syncedLyrics")
-                        plain_lyrics = first_match.get("plainLyrics")
-                        if synced_lrc:
-                            return LyricsResult(
-                                is_synced=True,
-                                source="lrclib",
-                                lines=self.parse_lrc(synced_lrc),
-                                plain_lyrics=plain_lyrics,
-                                title=first_match.get("trackName"),
-                                artist=first_match.get("artistName"),
-                            )
-                        elif plain_lyrics:
-                            raw_lines = [l.strip() for l in plain_lyrics.splitlines() if l.strip()]
-                            total = len(raw_lines)
-                            step = (duration / total) if total > 0 and duration > 0 else 4.0
-                            return LyricsResult(
-                                is_synced=True,
-                                source="lrclib",
-                                lines=[
-                                    LyricLine(time=round(i * step, 2), text=text)
-                                    for i, text in enumerate(raw_lines)
-                                ],
-                                plain_lyrics=plain_lyrics,
-                                title=first_match.get("trackName"),
-                                artist=first_match.get("artistName"),
-                            )
+                        if search_res.status_code == 200:
+                            items = search_res.json()
+                            if isinstance(items, list) and len(items) > 0:
+                                # Priorizar el primer resultado que tenga letras sincronizadas
+                                best_item = next((it for it in items if it.get("syncedLyrics")), items[0])
+                                synced_lrc = best_item.get("syncedLyrics")
+                                plain_lyrics = best_item.get("plainLyrics")
+
+                                if synced_lrc:
+                                    return LyricsResult(
+                                        is_synced=True,
+                                        source="lrclib",
+                                        lines=self.parse_lrc(synced_lrc),
+                                        plain_lyrics=plain_lyrics,
+                                        title=best_item.get("trackName") or clean_title,
+                                        artist=best_item.get("artistName") or clean_artist,
+                                    )
+                                elif plain_lyrics:
+                                    raw_lines = [l.strip() for l in plain_lyrics.splitlines() if l.strip()]
+                                    total = len(raw_lines)
+                                    step = (duration / total) if total > 0 and duration and duration > 0 else 4.0
+                                    return LyricsResult(
+                                        is_synced=True,
+                                        source="lrclib",
+                                        lines=[
+                                            LyricLine(time=round(i * step, 2), text=text)
+                                            for i, text in enumerate(raw_lines)
+                                        ],
+                                        plain_lyrics=plain_lyrics,
+                                        title=best_item.get("trackName") or clean_title,
+                                        artist=best_item.get("artistName") or clean_artist,
+                                    )
+                    except Exception:
+                        continue
+
+                # 3. Fallback a API secundaria de letras (lyrics.ovh)
+                candidate_pairs = []
+                if clean_artist and clean_title:
+                    candidate_pairs.append((clean_artist, clean_title))
+                if " - " in track_name:
+                    p1, p2 = [p.strip() for p in track_name.split(" - ", 1)]
+                    candidate_pairs.append((p1, p2))
+                    candidate_pairs.append((p2, p1))
+
+                for art, trk in candidate_pairs:
+                    try:
+                        clean_art_encoded = re.sub(r"[^\w\s]", "", art).strip()
+                        clean_trk_encoded = re.sub(r"[^\w\s]", "", trk).strip()
+                        ovh_res = await client.get(
+                            f"https://api.lyrics.ovh/v1/{clean_art_encoded}/{clean_trk_encoded}",
+                            timeout=4.0,
+                        )
+                        if ovh_res.status_code == 200:
+                            data = ovh_res.json()
+                            lyrics_text = data.get("lyrics", "").strip()
+                            if lyrics_text:
+                                raw_lines = [l.strip() for l in lyrics_text.splitlines() if l.strip()]
+                                total = len(raw_lines)
+                                step = (duration / total) if total > 0 and duration and duration > 0 else 4.0
+                                return LyricsResult(
+                                    is_synced=True,
+                                    source="lyrics_ovh",
+                                    lines=[
+                                        LyricLine(time=round(i * step, 2), text=text)
+                                        for i, text in enumerate(raw_lines)
+                                    ],
+                                    plain_lyrics=lyrics_text,
+                                    title=trk,
+                                    artist=art,
+                                )
+                    except Exception:
+                        continue
 
         except Exception:
-            # En caso de desconexión o fallo de API externa, degradación suave
             pass
 
         return LyricsResult(
@@ -180,8 +292,8 @@ class LyricsService:
             source="not_found",
             lines=[],
             plain_lyrics=None,
-            title=track_name,
-            artist=artist_name,
+            title=clean_title or track_name,
+            artist=clean_artist or artist_name,
         )
 
     def align_chords_with_lyrics(

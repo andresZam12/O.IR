@@ -37,7 +37,26 @@ export default function ChordSheetView({
 
     // CASO A: Letra completa obtenida automáticamente por la IA
     if (lines.length > 0) {
-      return lines.map((line, idx) => {
+      const formatted: FormattedLine[] = [];
+
+      // 1. Si la canción tiene introducción instrumental antes del primer verso cantado
+      const firstLineTime = lines[0].time;
+      if (firstLineTime > 4.0) {
+        const introChords = chords.filter((c) => c.time < firstLineTime);
+        if (introChords.length > 0) {
+          const chordText = introChords
+            .map((c) => getChordDisplay(c.chord).padEnd(16, " "))
+            .join("");
+          formatted.push({
+            chordLine: `   ${chordText.trimEnd()}`,
+            lyricLine: `[INTRO INSTRUMENTAL]   ${introChords.map((c) => getChordDisplay(c.chord)).join("  -  ")}`,
+            time: 0.0,
+          });
+        }
+      }
+
+      // 2. Mapear cada verso de la letra con sus acordes exactos
+      lines.forEach((line, idx) => {
         const lineStart = line.time;
         const nextLineStart = lines[idx + 1]?.time || lineStart + 6;
         const lineDuration = Math.max(nextLineStart - lineStart, 2);
@@ -56,8 +75,14 @@ export default function ChordSheetView({
           if (lastChord) activeChords = [lastChord];
         }
 
-        const text = line.text.trim();
-        if (!text) return { chordLine: "", lyricLine: "", time: lineStart };
+        let text = line.text.trim();
+        if (!text) {
+          if (activeChords.length > 0) {
+            text = "[INTERLUDIO INSTRUMENTAL]";
+          } else {
+            return;
+          }
+        }
 
         // Construir la línea de acordes alineada sobre las palabras
         const chordLineChars = new Array(Math.max(text.length, 36)).fill(" ");
@@ -89,12 +114,14 @@ export default function ChordSheetView({
           });
         }
 
-        return {
+        formatted.push({
           chordLine: chordLineChars.join("").trimEnd(),
           lyricLine: text,
           time: lineStart,
-        };
+        });
       });
+
+      return formatted;
     }
 
     // CASO B: Estructuración musical completa automática de inicio a fin desde los acordes detectados
