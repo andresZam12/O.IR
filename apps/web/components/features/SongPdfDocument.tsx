@@ -245,31 +245,105 @@ export default function SongPdfDocument({ data }: SongPdfDocumentProps) {
           </View>
         )}
 
-        {/* Cancionero: Letras con Acordes Arriba */}
-        <Text style={styles.songSheetTitle}>Letra y Progresión Armónica</Text>
+        {/* Cancionero: Letras con Acordes Arriba (Formato Cancionero Profesional) */}
+        <Text style={styles.songSheetTitle}>Cancionero: Acordes sobre Letra</Text>
 
         <View style={styles.lyricsContainer}>
           {data.lyrics?.lines && data.lyrics.lines.length > 0 ? (
-            data.lyrics.lines.map((line, idx) => (
-              <View key={idx} style={styles.lyricRow}>
-                {line.chord && (
-                  <Text style={styles.chordAbove}>{line.chord}</Text>
-                )}
-                <Text style={styles.lyricText}>{line.text}</Text>
-              </View>
-            ))
+            data.lyrics.lines.map((line, idx) => {
+              const text = line.text.trim();
+              if (!text) return null;
+
+              // Distribuir acordes en Courier monoespaciado
+              const lineStart = line.time;
+              const nextStart = data.lyrics?.lines[idx + 1]?.time || lineStart + 6;
+              const duration = Math.max(nextStart - lineStart, 2);
+
+              const lineChords = data.chords.filter(
+                (c) => c.time >= lineStart - 0.5 && c.time < nextStart
+              );
+
+              let chordLineChars = new Array(Math.max(text.length, 30)).fill(" ");
+              if (lineChords.length === 0) {
+                if (line.chord) {
+                  for (let i = 0; i < line.chord.length; i++) {
+                    chordLineChars[Math.min(6, text.length) + i] = line.chord[i];
+                  }
+                }
+              } else {
+                lineChords.forEach((c) => {
+                  const ratio = Math.max(0, Math.min(0.85, (c.time - lineStart) / duration));
+                  const insertPos = Math.floor(ratio * text.length);
+                  for (let i = 0; i < c.chord.length; i++) {
+                    if (insertPos + i < chordLineChars.length) {
+                      chordLineChars[insertPos + i] = c.chord[i];
+                    }
+                  }
+                });
+              }
+
+              const chordLineStr = chordLineChars.join("").trimEnd();
+
+              return (
+                <View key={idx} style={{ marginBottom: 6 }}>
+                  {chordLineStr ? (
+                    <Text
+                      style={{
+                        fontFamily: "Courier-Bold",
+                        fontSize: 9,
+                        color: "#d97706",
+                        marginBottom: 1,
+                      }}
+                    >
+                      {chordLineStr}
+                    </Text>
+                  ) : null}
+                  <Text
+                    style={{
+                      fontFamily: "Courier",
+                      fontSize: 9,
+                      color: "#1e293b",
+                    }}
+                  >
+                    {text}
+                  </Text>
+                </View>
+              );
+            })
           ) : (
-            // Si no hay letra, listar los acordes secuenciales con tiempo
-            <View style={styles.lyricsContainer}>
-              {data.chords.map((c, i) => (
-                <Text key={i} style={styles.lyricText}>
-                  [{Math.floor(c.time / 60)}:
-                  {Math.floor(c.time % 60)
-                    .toString()
-                    .padStart(2, "0")}
-                  ] {c.chord}
-                </Text>
-              ))}
+            // Si no hay letra, estructurar en compases de 4 acordes
+            <View style={{ marginTop: 4 }}>
+              <Text
+                style={{
+                  fontSize: 8,
+                  fontFamily: "Helvetica-Bold",
+                  color: "#64748b",
+                  marginBottom: 6,
+                  textTransform: "uppercase",
+                }}
+              >
+                Progresión armónica por compases (4 tiempos):
+              </Text>
+              {Array.from({ length: Math.ceil(data.chords.length / 4) }).map((_, bIdx) => {
+                const barChords = data.chords.slice(bIdx * 4, bIdx * 4 + 4);
+                const barText = barChords
+                  .map((c) => c.chord.padEnd(8, " "))
+                  .join(" | ");
+
+                return (
+                  <Text
+                    key={bIdx}
+                    style={{
+                      fontFamily: "Courier-Bold",
+                      fontSize: 9,
+                      color: "#b45309",
+                      marginBottom: 4,
+                    }}
+                  >
+                    {`|  ${barText} |`}
+                  </Text>
+                );
+              })}
             </View>
           )}
         </View>

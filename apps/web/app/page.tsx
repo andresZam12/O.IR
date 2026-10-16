@@ -7,6 +7,7 @@ import KaraokeView from "@/components/features/KaraokeView";
 import DifficultyCard from "@/components/features/DifficultyCard";
 import PdfDownloadButton from "@/components/features/PdfDownloadButton";
 import TransposerControl from "@/components/features/TransposerControl";
+import ChordSheetView from "@/components/features/ChordSheetView";
 import { pollJobUntilComplete } from "@/services/api";
 import { ProcessedSongResult, SongJobStatus } from "@/types/song";
 
@@ -18,6 +19,7 @@ export default function HomePage() {
   );
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [transposeMap, setTransposeMap] = useState<Record<string, string>>({});
+  const [resultTab, setResultTab] = useState<"chordsheet" | "karaoke">("chordsheet");
 
   // Acordes actualizados en tiempo real según la transposición elegida
   const displayChords = useMemo(() => {
@@ -159,13 +161,49 @@ export default function HomePage() {
             />
           )}
 
-          {/* Vista Karaoke interactiva con acordes dinámicos */}
-          <KaraokeView
-            chords={displayChords}
-            lyrics={processedData.lyrics}
-            duration={processedData.duration}
-            estimatedKey={processedData.estimated_key}
-          />
+          {/* Selector de Vista: Cancionero (Acordes sobre Letra) vs Karaoke Interactivo */}
+          <div className="flex border-b border-slate-800 space-x-2">
+            <button
+              type="button"
+              onClick={() => setResultTab("chordsheet")}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-bold transition-all ${
+                resultTab === "chordsheet"
+                  ? "bg-amber-500/20 text-amber-400 border border-amber-500/50 shadow-lg shadow-amber-950/30"
+                  : "text-slate-400 hover:text-white hover:bg-slate-800/40"
+              }`}
+            >
+              📜 Cancionero (Acordes sobre Letra)
+            </button>
+            <button
+              type="button"
+              onClick={() => setResultTab("karaoke")}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-bold transition-all ${
+                resultTab === "karaoke"
+                  ? "bg-primary-600/30 text-primary-300 border border-primary-500/50 shadow-lg shadow-primary-950/30"
+                  : "text-slate-400 hover:text-white hover:bg-slate-800/40"
+              }`}
+            >
+              🎤 Karaoke Interactivo
+            </button>
+          </div>
+
+          {resultTab === "chordsheet" ? (
+            <ChordSheetView
+              title={processedData.lyrics?.title || "Audio Analizado"}
+              artist={processedData.lyrics?.artist || "Desconocido"}
+              chords={displayChords}
+              lyrics={processedData.lyrics}
+              estimatedKey={processedData.estimated_key}
+              transposeMap={transposeMap}
+            />
+          ) : (
+            <KaraokeView
+              chords={displayChords}
+              lyrics={processedData.lyrics}
+              duration={processedData.duration}
+              estimatedKey={processedData.estimated_key}
+            />
+          )}
         </div>
       )}
     </main>
