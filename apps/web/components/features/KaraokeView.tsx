@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { ChordItem, LyricsResult } from "@/types/song";
 
 interface KaraokeViewProps {
@@ -8,6 +8,13 @@ interface KaraokeViewProps {
   lyrics?: LyricsResult;
   duration: number;
   estimatedKey?: string | null;
+}
+
+interface FormattedPrompterLine {
+  chordLine: string;
+  lyricLine: string;
+  time: number;
+  endTime: number;
 }
 
 export default function KaraokeView({
@@ -18,8 +25,10 @@ export default function KaraokeView({
 }: KaraokeViewProps) {
   const [currentTime, setCurrentTime] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
+  const activeLineRef = useRef<HTMLDivElement | null>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
 
-  // Reproductor simulado con timer
+  // Reproductor sincronizado con timer de alta precisión
   useEffect(() => {
     let interval: NodeJS.Timeout | null = null;
     if (isPlaying) {
@@ -38,51 +47,152 @@ export default function KaraokeView({
     };
   }, [isPlaying, duration]);
 
-  // Buscar el acorde activo en el currentTime actual
-  const currentChord =
-    chords
+  // Acorde activo en el segundo actual para el display superior
+  const currentChord = useMemo(() => {
+    if (!chords || chords.length === 0) return "N/C";
+    const found = chords
       .slice()
       .reverse()
-      .find((c) => c.time <= currentTime)?.chord || "N/C";
+      .find((c) => c.time <= currentTime);
+    return found ? found.chord : chords[0].chord;
+  }, [chords, currentTime]);
+
+  // Construir las líneas completas del visor prompter (con acordes alineados arriba)
+  const prompterLines = useMemo<FormattedPrompterLine[]>(() => {
+    const lines = lyrics?.lines || [];
+
+    if (lines.length > 0) {
+      return lines.map((line, idx) => {
+        const lineStart = line.time;
+        const nextLineStart = lines[idx + 1]?.time || (lineStart + 6);
+        const lineDuration = Math.max(nextLineStart - lineStart, 2);
+
+        // Buscar acordes en la ventana de tiempo
+        const lineChords = chords.filter(
+          (c) => c.time >= lineStart - 0.5 && c.time < nextLineStart
+        );
+
+        let activeChords = lineChords;
+        if (activeChords.length === 0) {
+          const lastChord = chords
+            .slice()
+            .reverse()
+            .find((c) => c.time <= lineStart);
+          if (lastChord) activeChords = [lastChord];
+        }
+
+        const text = line.text.trim();
+        const chordLineChars = new Array(Math.max(text.length, 36)).fill(" ");
+
+        if (activeChords.length === 1) {
+          const chordName = activeChords[0].chord;
+          const insertPos = Math.min(4, Math.max(0, text.length - chordName.length));
+          for (let i = 0; i < chordName.length; i++) {
+            chordLineChars[insertPos + i] = chordName[i];
+          }
+        } else {
+          activeChords.forEach((c, cIdx) => {
+            const chordName = c.chord;
+            const ratio = Math.max(0, Math.min(0.85, (c.time - lineStart) / lineDuration));
+            let insertPos = Math.floor(ratio * text.length);
+
+            if (cIdx > 0) {
+              const prevRatio = Math.max(0, (activeChords[cIdx - 1].time - lineStart) / lineDuration);
+              const prevChordEnd = Math.floor(prevRatio * text.length) + activeChords[cIdx - 1].chord.length + 2;
+              if (insertPos < prevChordEnd) insertPos = prevChordEnd;
+            }
+
+            for (let i = 0; i < chordName.length; i++) {
+              if (insertPos + i < chordLineChars.length) {
+                chordLineChars[insertPos + i] = chordName[i];
+              }
+            }
+          });
+        }
+
+        return {
+          chordLine: chordLineChars.join("").trimEnd(),
+          lyricLine: text,
+          time: lineStart,
+          endTime: nextLineStart,
+        };
+      });
+    }
+
+    // Estructuración automática si no hay letra
+    const step = 2;
+    const sectionNames = ["INTRO", "ESTROFA 1", "ESTROFA 2", "CORO", "PUENTE", "ESTROFA 3", "CORO FINAL", "OUTRO"];
+    let secIdx = 0;
+    const generated: FormattedPrompterLine[] = [];
+
+    for (let i = 0; i < chords.length; i += step) {
+      const chunk = chords.slice(i, i + step);
+      const startT = chunk[0].time;
+      const endT = chords[i + step]?.time || (startT + 6);
+      const currentSec = sectionNames[secIdx % sectionNames.length];
+      if (i > 0 && i % (step * 2) === 0) secIdx++;
+
+      const chordText = chunk.map((c) => c.chord.padEnd(14, " ")).join("");
+      const phraseText = `[${currentSec}]   ` + chunk.map((c) => c.chord).join("  -  ");
+
+      generated.push({
+        chordLine: `   ${chordText}`,
+        lyricLine: phraseText,
+        time: startT,
+        endTime: endT,
+      });
+    }
+
+    return generated;
+  }, [lyrics?.lines, chords]);
+
+  // Auto-scroll del prompter hacia la línea activa durante la reproducción
+  useEffect(() => {
+    if (isPlaying && activeLineRef.current) {
+      activeLineRef.current.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+    }
+  }, [currentTime, isPlaying]);
 
   return (
-    <div className="card w-full max-w-3xl mx-auto shadow-2xl border-slate-800 bg-slate-900/90 backdrop-blur-md p-6 sm:p-8">
-      {/* Barra superior con Tonalidad y Acorde Activo Gigante */}
-      <div className="flex items-center justify-between pb-6 border-b border-slate-800">
+    <div className="card w-full max-w-4xl mx-auto shadow-2xl border-slate-800 bg-[#0b0f19] p-6 sm:p-8">
+      {/* Barra superior: Tonalidad y Acorde Actual Gigante */}
+      <div className="flex items-center justify-between pb-6 border-b border-slate-800/80">
         <div>
-          <span className="text-xs uppercase tracking-wider font-semibold text-slate-400">
-            Tonalidad Estimada
+          <span className="text-xs uppercase tracking-widest font-bold text-slate-400">
+            Tonalidad
           </span>
-          <p className="text-xl font-bold text-white mt-0.5">
-            {estimatedKey || "No determinada"}
+          <p className="text-2xl font-black text-white mt-0.5">
+            {estimatedKey || "Estándar"}
           </p>
         </div>
 
-        {/* Display del acorde activo */}
         <div className="text-right">
-          <span className="text-xs uppercase tracking-wider font-semibold text-slate-400">
+          <span className="text-xs uppercase tracking-widest font-bold text-amber-500">
             Acorde Actual
           </span>
           <div className="mt-1">
-            <span className="inline-block bg-primary-600/30 border border-primary-500/60 text-primary-300 text-3xl font-black px-4 py-1.5 rounded-xl shadow-lg shadow-primary-900/40">
+            <span className="inline-block bg-amber-500/20 border-2 border-amber-500 text-amber-400 text-4xl font-black px-6 py-2 rounded-2xl shadow-xl shadow-amber-950/50 tracking-wider">
               {currentChord}
             </span>
           </div>
         </div>
       </div>
 
-      {/* Control de reproducción / Timeline */}
-      <div className="my-6 bg-slate-950/70 p-4 rounded-xl border border-slate-800">
-        <div className="flex items-center justify-between mb-2">
+      {/* Control de reproducción / Timeline sincronizado */}
+      <div className="my-6 bg-slate-950/80 p-4 rounded-2xl border border-slate-800/80">
+        <div className="flex items-center justify-between mb-3">
           <button
             type="button"
             onClick={() => setIsPlaying(!isPlaying)}
-            className="flex items-center gap-2 bg-primary-600 hover:bg-primary-500 text-white font-semibold text-xs py-2 px-4 rounded-lg transition-colors"
+            className="flex items-center gap-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs py-2.5 px-5 rounded-xl transition-all shadow-md shadow-amber-950/40 hover:scale-105 active:scale-95"
           >
             {isPlaying ? "⏸️ Pausar" : "▶️ Reproducir"}
           </button>
 
-          <span className="font-mono text-xs text-slate-300">
+          <span className="font-mono text-xs font-semibold text-slate-300">
             {formatTime(currentTime)} / {formatTime(duration)}
           </span>
         </div>
@@ -94,92 +204,55 @@ export default function KaraokeView({
           step="0.1"
           value={currentTime}
           onChange={(e) => setCurrentTime(parseFloat(e.target.value))}
-          className="w-full accent-primary-500 cursor-pointer"
+          className="w-full accent-amber-500 cursor-pointer"
         />
       </div>
 
-      {/* Vista Karaoke con letra y acordes sobre cada línea */}
-      {lyrics?.lines && lyrics.lines.length > 0 ? (
-        <div className="space-y-4 max-h-96 overflow-y-auto pr-2">
-          {lyrics.lines.map((line, idx) => {
-            const isLineActive =
-              currentTime >= line.time &&
-              (idx === lyrics.lines.length - 1 ||
-                currentTime < lyrics.lines[idx + 1].time);
+      {/* Visor Prompter Sincronizado (Acordes sobre Letra con auto-scroll) */}
+      <div
+        ref={containerRef}
+        className="max-h-[480px] overflow-y-auto pr-2 space-y-4 font-mono scroll-smooth"
+      >
+        {prompterLines.map((line, idx) => {
+          const isLineActive =
+            currentTime >= line.time &&
+            (idx === prompterLines.length - 1 || currentTime < line.endTime);
 
-            return (
-              <div
-                key={idx}
-                onClick={() => setCurrentTime(line.time)}
-                className={`p-3 rounded-xl transition-all cursor-pointer border ${
-                  isLineActive
-                    ? "bg-primary-950/40 border-primary-500 shadow-md shadow-primary-950"
-                    : "bg-slate-950/40 border-slate-800/60 hover:border-slate-700"
-                }`}
-              >
-                {/* Acorde encima de la letra */}
-                {line.chord && (
-                  <span className="inline-block font-mono font-bold text-xs text-primary-400 bg-primary-950/80 border border-primary-800 px-2 py-0.5 rounded mb-1">
-                    {line.chord}
-                  </span>
-                )}
-                {/* Texto de la letra */}
-                <p
-                  className={`text-base font-medium transition-colors ${
-                    isLineActive ? "text-white font-semibold" : "text-slate-400"
+          return (
+            <div
+              key={idx}
+              ref={isLineActive ? activeLineRef : null}
+              onClick={() => setCurrentTime(line.time)}
+              className={`p-4 rounded-xl transition-all cursor-pointer border ${
+                isLineActive
+                  ? "bg-amber-500/10 border-amber-500/80 shadow-lg shadow-amber-950/40 scale-[1.01]"
+                  : "bg-slate-950/40 border-slate-900/60 opacity-60 hover:opacity-100 hover:border-slate-800"
+              }`}
+            >
+              {/* Acordes alineados arriba */}
+              {line.chordLine && (
+                <pre
+                  className={`text-sm font-bold tracking-widest whitespace-pre transition-colors ${
+                    isLineActive ? "text-amber-400 font-black" : "text-amber-500/70"
                   }`}
                 >
-                  {line.text}
-                </p>
-              </div>
-            );
-          })}
-        </div>
-      ) : (
-        /* Progresión musical estructurada por compases */
-        <div className="space-y-4">
-          <div className="p-3 bg-amber-950/40 border border-amber-900/60 rounded-xl text-xs text-amber-300">
-            💡 <strong>Tip de visualización:</strong> Haz clic en la pestaña <strong>&quot;📜 Cancionero (Acordes sobre Letra)&quot;</strong> arriba para ver o pegar los versos con los acordes encima de las palabras.
-          </div>
-          <div className="space-y-2.5 font-mono">
-            {Array.from({ length: Math.ceil(chords.length / 4) }).map((_, barIdx) => {
-              const barChords = chords.slice(barIdx * 4, barIdx * 4 + 4);
-              return (
-                <div
-                  key={barIdx}
-                  className="flex items-center gap-3 p-3 rounded-xl bg-slate-950/60 border border-slate-800"
+                  {line.chordLine}
+                </pre>
+              )}
+              {/* Letra de la canción alineada abajo */}
+              {line.lyricLine && (
+                <pre
+                  className={`text-sm font-medium tracking-wide whitespace-pre transition-colors ${
+                    isLineActive ? "text-white font-bold" : "text-slate-400"
+                  }`}
                 >
-                  <span className="text-xs text-slate-500 font-sans w-20">
-                    Compás {barIdx + 1}:
-                  </span>
-                  <div className="flex-1 grid grid-cols-4 gap-2">
-                    {barChords.map((c, i) => {
-                      const overallIdx = barIdx * 4 + i;
-                      const isCurrent =
-                        currentTime >= c.time &&
-                        (overallIdx === chords.length - 1 ||
-                          currentTime < chords[overallIdx + 1]?.time);
-                      return (
-                        <div
-                          key={i}
-                          onClick={() => setCurrentTime(c.time)}
-                          className={`text-center py-2 px-1 rounded-lg border cursor-pointer transition-all ${
-                            isCurrent
-                              ? "bg-amber-500 border-amber-400 text-slate-950 font-black shadow-lg"
-                              : "bg-slate-900/80 border-slate-800 text-amber-400 hover:border-slate-700 font-bold"
-                          }`}
-                        >
-                          <span className="text-sm">{c.chord}</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
+                  {isLineActive ? `▶  ${line.lyricLine}` : `   ${line.lyricLine}`}
+                </pre>
+              )}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

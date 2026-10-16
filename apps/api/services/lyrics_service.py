@@ -113,10 +113,22 @@ class LyricsService:
                             artist=data.get("artistName"),
                         )
                     elif plain_lyrics:
+                        # Distribuir letras planas proporcionalmente a lo largo de la duración
+                        raw_lines = [l.strip() for l in plain_lyrics.splitlines() if l.strip()]
+                        total = len(raw_lines)
+                        if total > 0 and duration > 0:
+                            step = duration / total
+                            distributed_lines = [
+                                LyricLine(time=round(i * step, 2), text=text)
+                                for i, text in enumerate(raw_lines)
+                            ]
+                        else:
+                            distributed_lines = [LyricLine(time=0.0, text=t) for t in raw_lines]
+
                         return LyricsResult(
-                            is_synced=False,
+                            is_synced=True,
                             source="lrclib",
-                            lines=[],
+                            lines=distributed_lines,
                             plain_lyrics=plain_lyrics,
                             title=data.get("trackName"),
                             artist=data.get("artistName"),
@@ -133,12 +145,28 @@ class LyricsService:
                     if isinstance(items, list) and len(items) > 0:
                         first_match = items[0]
                         synced_lrc = first_match.get("syncedLyrics")
+                        plain_lyrics = first_match.get("plainLyrics")
                         if synced_lrc:
                             return LyricsResult(
                                 is_synced=True,
                                 source="lrclib",
                                 lines=self.parse_lrc(synced_lrc),
-                                plain_lyrics=first_match.get("plainLyrics"),
+                                plain_lyrics=plain_lyrics,
+                                title=first_match.get("trackName"),
+                                artist=first_match.get("artistName"),
+                            )
+                        elif plain_lyrics:
+                            raw_lines = [l.strip() for l in plain_lyrics.splitlines() if l.strip()]
+                            total = len(raw_lines)
+                            step = (duration / total) if total > 0 and duration > 0 else 4.0
+                            return LyricsResult(
+                                is_synced=True,
+                                source="lrclib",
+                                lines=[
+                                    LyricLine(time=round(i * step, 2), text=text)
+                                    for i, text in enumerate(raw_lines)
+                                ],
+                                plain_lyrics=plain_lyrics,
                                 title=first_match.get("trackName"),
                                 artist=first_match.get("artistName"),
                             )
@@ -170,8 +198,49 @@ class LyricsService:
         Returns:
             LyricsResult con las líneas actualizadas con el campo chord correspondiente.
         """
-        if not lyrics.lines or not chords:
+        if not chords:
             return lyrics
+
+        if not lyrics.lines:
+            # Estructurar la progresión musical en frases y estrofas completas de inicio a fin
+            generated_lines: list[LyricLine] = []
+            section_names = [
+                "Intro",
+                "Estrofa 1",
+                "Estrofa 2",
+                "Coro",
+                "Puente Musical",
+                "Estrofa 3",
+                "Coro Final",
+                "Outro",
+            ]
+            step = 2  # Agrupar cada 2 acordes en una frase musical
+            sec_idx = 0
+
+            for i in range(0, len(chords), step):
+                chunk = chords[i : i + step]
+                start_t = chunk[0].time
+                current_sec = section_names[sec_idx % len(section_names)]
+                if i > 0 and i % (step * 2) == 0:
+                    sec_idx += 1
+
+                phrase_text = f"[{current_sec}]  {'    '.join(c.chord for c in chunk)}"
+                generated_lines.append(
+                    LyricLine(
+                        time=start_t,
+                        text=phrase_text,
+                        chord=chunk[0].chord,
+                    )
+                )
+
+            return LyricsResult(
+                is_synced=True,
+                source="auto_musical_structure",
+                lines=generated_lines,
+                plain_lyrics="\n".join(l.text for l in generated_lines),
+                title=lyrics.title,
+                artist=lyrics.artist,
+            )
 
         aligned_lines: list[LyricLine] = []
 
