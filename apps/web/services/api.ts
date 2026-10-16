@@ -11,6 +11,15 @@ import {
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
+function handleFetchError(err: unknown): never {
+  if (err instanceof TypeError && err.message.toLowerCase().includes("failed to fetch")) {
+    throw new Error(
+      `No se pudo conectar con el servidor backend (${API_BASE_URL}). Verifica que esté corriendo.`
+    );
+  }
+  throw err;
+}
+
 /**
  * Sube un archivo de audio (.mp3, .wav, etc.) al backend para su procesamiento.
  */
@@ -18,19 +27,23 @@ export async function uploadAudioFile(file: File): Promise<SongJobResponse> {
   const formData = new FormData();
   formData.append("file", file);
 
-  const response = await fetch(`${API_BASE_URL}/api/songs/upload`, {
-    method: "POST",
-    body: formData,
-  });
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/songs/upload`, {
+      method: "POST",
+      body: formData,
+    });
 
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(
-      errorData.detail || `Error al subir archivo (${response.status})`
-    );
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(
+        errorData.detail || `Error al subir archivo (${response.status})`
+      );
+    }
+
+    return response.json();
+  } catch (err) {
+    handleFetchError(err);
   }
-
-  return response.json();
 }
 
 /**
@@ -39,25 +52,29 @@ export async function uploadAudioFile(file: File): Promise<SongJobResponse> {
 export async function processSongUrl(
   youtubeUrl: string
 ): Promise<SongJobResponse> {
-  const response = await fetch(`${API_BASE_URL}/api/songs/process-url`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      source: "youtube",
-      youtube_url: youtubeUrl,
-    }),
-  });
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/songs/process-url`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        source: "youtube",
+        youtube_url: youtubeUrl,
+      }),
+    });
 
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(
-      errorData.detail || `Error al procesar URL (${response.status})`
-    );
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(
+        errorData.detail || `Error al procesar URL (${response.status})`
+      );
+    }
+
+    return response.json();
+  } catch (err) {
+    handleFetchError(err);
   }
-
-  return response.json();
 }
 
 /**
