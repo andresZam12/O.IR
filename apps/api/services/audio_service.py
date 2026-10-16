@@ -145,7 +145,13 @@ class AudioService:
         except Exception as e:
             if isinstance(e, ValueError):
                 raise
-            raise RuntimeError(f"Error al descargar audio de YouTube: {str(e)}")
+            err_msg = str(e)
+            if "not a bot" in err_msg.lower() or "sign in" in err_msg.lower():
+                raise RuntimeError(
+                    "YouTube ha limitado la descarga desde servidores en la nube para este video. "
+                    "Te sugerimos usar la pestaña 'Subir Archivo' (.mp3 o .wav) o la opción de micrófono para procesarlo al instante."
+                )
+            raise RuntimeError(f"Error al descargar audio de YouTube: {err_msg}")
 
     def cleanup_file(self, file_path: str) -> None:
         """Elimina un archivo temporal de audio una vez procesado."""
