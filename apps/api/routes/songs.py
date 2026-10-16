@@ -19,6 +19,8 @@ from schemas.song import (
     SongJobStatus,
     SongProcessRequest,
 )
+from schemas.transposition import TransposeRequest, TransposeResponse
+from services.transposition_service import TranspositionService
 from repositories.song_repository import SongRepository
 from workers.song_worker import execute_song_pipeline, process_song
 
@@ -298,3 +300,17 @@ async def get_job_status(job_id: str) -> SongJobStatus:
         step="error",
         error="Tarea no encontrada",
     )
+
+
+@router.post(
+    "/transpose",
+    response_model=TransposeResponse,
+    summary="Transponer lista de acordes y sugerir posición óptima de Capo",
+)
+async def transpose_chords_endpoint(request: TransposeRequest) -> TransposeResponse:
+    """
+    Permite transponer un conjunto de acordes a cualquier intervalo
+    de semitonos y devuelve sugerencias inteligentes de cejilla para principiantes.
+    """
+    service = TranspositionService()
+    return service.transpose_chords(request.chords, request.semitones)
