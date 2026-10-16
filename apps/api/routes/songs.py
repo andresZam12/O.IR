@@ -9,7 +9,15 @@ import uuid
 from typing import Optional
 from urllib.parse import urlparse
 import aiofiles
-from fastapi import APIRouter, BackgroundTasks, File, HTTPException, UploadFile, status
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    File,
+    Form,
+    HTTPException,
+    UploadFile,
+    status,
+)
 from celery.result import AsyncResult
 
 from core.celery_app import celery_app
@@ -103,10 +111,12 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 async def upload_audio_file(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
+    track_title: Optional[str] = Form(None),
+    artist_name: Optional[str] = Form(None),
 ) -> SongJobResponse:
     """
-    Recibe un archivo de audio (.mp3, .wav, etc.), lo guarda temporalmente
-    y crea una tarea asíncrona en Celery (o BackgroundTasks como fallback).
+    Recibe un archivo de audio (.mp3, .wav, etc.), opcionalmente título y artista,
+    lo guarda temporalmente y crea una tarea asíncrona para detección de acordes y letras.
     """
     if not file.filename:
         raise HTTPException(
@@ -135,7 +145,14 @@ async def upload_audio_file(
         )
 
     file_hash = SongRepository.generate_file_hash(saved_path)
-    track_title = os.path.splitext(file.filename)[0]
+    effective_title = (
+        track_title.strip()
+        if track_title and track_title.strip()
+        else os.path.splitext(file.filename)[0]
+    )
+    effective_artist = (
+        artist_name.strip() if artist_name and artist_name.strip() else None
+    )
 
     # Despachar a Celery si Redis está activo; de lo contrario, ejecutar localmente
     if is_redis_available():
@@ -143,7 +160,8 @@ async def upload_audio_file(
             task = process_song.delay(
                 audio_path=saved_path,
                 source="upload",
-                track_name=track_title,
+                track_name=effective_title,
+                artist_name=effective_artist,
                 identifier=file_hash,
             )
             job_id = task.id
@@ -160,8 +178,8 @@ async def upload_audio_file(
             job_id=job_id,
             audio_path=saved_path,
             source="upload",
-            track_name=track_title,
-            artist_name=None,
+            track_name=effective_title,
+            artist_name=effective_artist,
             identifier=file_hash,
         )
 

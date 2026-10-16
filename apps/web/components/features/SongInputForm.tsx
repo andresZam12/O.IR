@@ -19,6 +19,8 @@ export default function SongInputForm({
   const [mode, setMode] = useState<InputMode>("youtube");
   const [youtubeUrl, setYoutubeUrl] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [uploadSongTitle, setUploadSongTitle] = useState("");
+  const [uploadArtistName, setUploadArtistName] = useState("");
   const [isDragging, setIsDragging] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -60,7 +62,11 @@ export default function SongInputForm({
 
     try {
       setIsSubmitting(true);
-      const response = await uploadAudioFile(selectedFile);
+      const response = await uploadAudioFile(
+        selectedFile,
+        uploadSongTitle,
+        uploadArtistName
+      );
       onJobStarted(response.job_id);
     } catch (err: unknown) {
       onError(err instanceof Error ? err.message : "Error al subir el archivo");
@@ -250,6 +256,36 @@ export default function SongInputForm({
                 </p>
               </div>
             )}
+          </div>
+
+          {/* Campos opcionales pero recomendados para obtener la letra automáticamente */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1">
+                Nombre de la canción (para letra con IA)
+              </label>
+              <input
+                type="text"
+                value={uploadSongTitle}
+                onChange={(e) => setUploadSongTitle(e.target.value)}
+                placeholder="Ej. Azabache, De Música Ligera..."
+                disabled={isProcessing || isSubmitting}
+                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-primary-500"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1">
+                Artista o intérprete (opcional)
+              </label>
+              <input
+                type="text"
+                value={uploadArtistName}
+                onChange={(e) => setUploadArtistName(e.target.value)}
+                placeholder="Ej. Julio Jaramillo, Soda Stereo..."
+                disabled={isProcessing || isSubmitting}
+                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-primary-500"
+              />
+            </div>
           </div>
 
           <button

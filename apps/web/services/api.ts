@@ -28,9 +28,19 @@ function handleFetchError(err: unknown): never {
 /**
  * Sube un archivo de audio (.mp3, .wav, etc.) al backend para su procesamiento.
  */
-export async function uploadAudioFile(file: File): Promise<SongJobResponse> {
+export async function uploadAudioFile(
+  file: File,
+  trackTitle?: string,
+  artistName?: string
+): Promise<SongJobResponse> {
   const formData = new FormData();
   formData.append("file", file);
+  if (trackTitle && trackTitle.trim()) {
+    formData.append("track_title", trackTitle.trim());
+  }
+  if (artistName && artistName.trim()) {
+    formData.append("artist_name", artistName.trim());
+  }
 
   try {
     const response = await fetch(`${API_BASE_URL}/api/songs/upload`, {

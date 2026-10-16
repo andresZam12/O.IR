@@ -215,13 +215,26 @@ export default function ChordSheetView({
             <span className="text-xs text-slate-500">
               Los acordes detectados se posicionarán automáticamente sobre cada verso.
             </span>
-            <button
-              type="button"
-              onClick={() => setIsEditingLyrics(false)}
-              className="text-xs bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold px-3 py-1.5 rounded"
-            >
-              Aplicar al Cancionero
-            </button>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() =>
+                  setCustomLyrics(
+                    `EN EL NEGRO AZABACHE, DE TU BLONDA, CABELLERA\nY EN EL ROJO ESCARLATA, DE TU BOCA, TAN DIVINA\nY EN LAS FUENTES HERMOSAS, DE TUS OJOS, HECHICEROS\nES QUE BUSCA EL ALMA, LA ESPERANZA, PERDIDA.\n\nYO TE SOÑÉ, PERO NUNCA TE PUDE ENCONTRAR\nY AL FIN TE ENCONTRÉ, Y ESOS SUEÑOS SE HAN TORNADO EN REALIDAD.\n\nDIME QUE ME QUIERES,\nDIME QUE ME AMAS`
+                  )
+                }
+                className="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold px-2.5 py-1.5 rounded"
+              >
+                Cargar Ejemplo Azabache
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsEditingLyrics(false)}
+                className="text-xs bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold px-3 py-1.5 rounded"
+              >
+                Aplicar al Cancionero
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -248,20 +261,37 @@ export default function ChordSheetView({
             ))}
           </div>
         ) : (
-          /* Si no hay letra aún, mostrar los compases musicales estructurados */
+          /* Si no hay letra aún, permitir cargarla en un clic o ver compases */
           <div className="space-y-4">
-            <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800 text-center print:hidden">
-              <p className="text-xs text-slate-400 mb-2">
-                No se encontraron letras automáticas para este audio. Puedes pulsar{" "}
+            <div className="p-5 rounded-xl bg-slate-950/80 border border-slate-800 text-center print:hidden">
+              <span className="text-2xl block mb-2">📜</span>
+              <h4 className="text-sm font-bold text-white mb-1">
+                Visualiza los acordes sobre la letra de tu canción
+              </h4>
+              <p className="text-xs text-slate-400 mb-4 max-w-md mx-auto">
+                No se detectó letra automática para este archivo de audio. Puedes ingresar la letra o cargar la canción de ejemplo para alinear los acordes detectados por la IA:
+              </p>
+              <div className="flex flex-wrap items-center justify-center gap-3">
                 <button
                   type="button"
                   onClick={() => setIsEditingLyrics(true)}
-                  className="text-amber-400 underline font-semibold"
+                  className="text-xs bg-slate-800 hover:bg-slate-700 text-amber-400 font-bold px-3.5 py-2 rounded-lg border border-slate-700 transition-colors"
                 >
-                  Pegar / Editar Letra
-                </button>{" "}
-                para montarlas encima de los versos, o leer la partitura de compases:
-              </p>
+                  ✏️ Pegar Mi Letra
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCustomLyrics(
+                      `EN EL NEGRO AZABACHE, DE TU BLONDA, CABELLERA\nY EN EL ROJO ESCARLATA, DE TU BOCA, TAN DIVINA\nY EN LAS FUENTES HERMOSAS, DE TUS OJOS, HECHICEROS\nES QUE BUSCA EL ALMA, LA ESPERANZA, PERDIDA.\n\nYO TE SOÑÉ, PERO NUNCA TE PUDE ENCONTRAR\nY AL FIN TE ENCONTRÉ, Y ESOS SUEÑOS SE HAN TORNADO EN REALIDAD.\n\nDIME QUE ME QUIERES,\nDIME QUE ME AMAS`
+                    );
+                    setIsEditingLyrics(false);
+                  }}
+                  className="text-xs bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold px-4 py-2 rounded-lg shadow-lg shadow-amber-950/40 transition-colors"
+                >
+                  🎵 Ver con Letra de Azabache
+                </button>
+              </div>
             </div>
 
             <div className="p-6 rounded-xl bg-slate-950/60 border border-slate-800/80 print:bg-white print:border-none">

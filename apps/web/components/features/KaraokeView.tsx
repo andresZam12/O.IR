@@ -136,30 +136,44 @@ export default function KaraokeView({
           })}
         </div>
       ) : (
-        /* Secuencia de acordes si no hay letra */
-        <div className="max-h-80 overflow-y-auto">
-          <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">
-            Secuencia temporal de acordes:
-          </h4>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-            {chords.map((c, i) => {
-              const isCurrent =
-                currentTime >= c.time &&
-                (i === chords.length - 1 || currentTime < chords[i + 1].time);
+        /* Progresión musical estructurada por compases */
+        <div className="space-y-4">
+          <div className="p-3 bg-amber-950/40 border border-amber-900/60 rounded-xl text-xs text-amber-300">
+            💡 <strong>Tip de visualización:</strong> Haz clic en la pestaña <strong>&quot;📜 Cancionero (Acordes sobre Letra)&quot;</strong> arriba para ver o pegar los versos con los acordes encima de las palabras.
+          </div>
+          <div className="space-y-2.5 font-mono">
+            {Array.from({ length: Math.ceil(chords.length / 4) }).map((_, barIdx) => {
+              const barChords = chords.slice(barIdx * 4, barIdx * 4 + 4);
               return (
                 <div
-                  key={i}
-                  onClick={() => setCurrentTime(c.time)}
-                  className={`p-2.5 rounded-lg border text-center cursor-pointer transition-all ${
-                    isCurrent
-                      ? "bg-primary-600 border-primary-400 text-white font-bold"
-                      : "bg-slate-950/60 border-slate-800 text-slate-300 hover:border-slate-700"
-                  }`}
+                  key={barIdx}
+                  className="flex items-center gap-3 p-3 rounded-xl bg-slate-950/60 border border-slate-800"
                 >
-                  <span className="block text-xs text-slate-500 font-mono">
-                    {formatTime(c.time)}
+                  <span className="text-xs text-slate-500 font-sans w-20">
+                    Compás {barIdx + 1}:
                   </span>
-                  <span className="text-base font-bold">{c.chord}</span>
+                  <div className="flex-1 grid grid-cols-4 gap-2">
+                    {barChords.map((c, i) => {
+                      const overallIdx = barIdx * 4 + i;
+                      const isCurrent =
+                        currentTime >= c.time &&
+                        (overallIdx === chords.length - 1 ||
+                          currentTime < chords[overallIdx + 1]?.time);
+                      return (
+                        <div
+                          key={i}
+                          onClick={() => setCurrentTime(c.time)}
+                          className={`text-center py-2 px-1 rounded-lg border cursor-pointer transition-all ${
+                            isCurrent
+                              ? "bg-amber-500 border-amber-400 text-slate-950 font-black shadow-lg"
+                              : "bg-slate-900/80 border-slate-800 text-amber-400 hover:border-slate-700 font-bold"
+                          }`}
+                        >
+                          <span className="text-sm">{c.chord}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               );
             })}
