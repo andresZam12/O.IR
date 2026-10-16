@@ -76,6 +76,22 @@ export default function SongInputForm({
     }
   };
 
+  // Procesar archivo seleccionado y autocompletar título/artista desde el nombre del archivo
+  const handleFileChange = (file: File) => {
+    setSelectedFile(file);
+    const rawName = file.name.replace(/\.[^/.]+$/, "");
+    if (rawName.includes(" - ")) {
+      const parts = rawName.split(" - ");
+      if (!uploadArtistName.trim()) setUploadArtistName(parts[0].trim());
+      if (!uploadSongTitle.trim()) setUploadSongTitle(parts.slice(1).join(" - ").trim());
+    } else {
+      if (!uploadSongTitle.trim()) {
+        const cleanTitle = rawName.replace(/[_-]/g, " ").trim();
+        setUploadSongTitle(cleanTitle);
+      }
+    }
+  };
+
   // Manejo de Drag and Drop
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -90,8 +106,7 @@ export default function SongInputForm({
     e.preventDefault();
     setIsDragging(false);
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      const file = e.dataTransfer.files[0];
-      setSelectedFile(file);
+      handleFileChange(e.dataTransfer.files[0]);
     }
   };
 
@@ -234,7 +249,7 @@ export default function SongInputForm({
               accept=".mp3,.wav,.ogg,.m4a,.webm"
               onChange={(e) => {
                 if (e.target.files && e.target.files[0]) {
-                  setSelectedFile(e.target.files[0]);
+                  handleFileChange(e.target.files[0]);
                 }
               }}
               className="hidden"
@@ -339,14 +354,44 @@ export default function SongInputForm({
           </div>
 
           {selectedFile && !isRecording && (
-            <button
-              type="button"
-              onClick={handleFileSubmit}
-              disabled={isProcessing}
-              className="w-full bg-primary-600 hover:bg-primary-500 disabled:opacity-50 text-white font-semibold py-3.5 px-6 rounded-xl transition-all shadow-lg shadow-primary-900/30"
-            >
-              Analizar Grabación de Micrófono 🎸
-            </button>
+            <div className="space-y-4 pt-2 text-left">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">
+                    Nombre de la canción (para extraer letra completa)
+                  </label>
+                  <input
+                    type="text"
+                    value={uploadSongTitle}
+                    onChange={(e) => setUploadSongTitle(e.target.value)}
+                    placeholder="Ej. Azabache, De Música Ligera..."
+                    disabled={isProcessing || isSubmitting}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-primary-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">
+                    Artista o intérprete (opcional)
+                  </label>
+                  <input
+                    type="text"
+                    value={uploadArtistName}
+                    onChange={(e) => setUploadArtistName(e.target.value)}
+                    placeholder="Ej. Julio Jaramillo, Soda Stereo..."
+                    disabled={isProcessing || isSubmitting}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-primary-500"
+                  />
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={handleFileSubmit}
+                disabled={isProcessing}
+                className="w-full bg-primary-600 hover:bg-primary-500 disabled:opacity-50 text-white font-semibold py-3.5 px-6 rounded-xl transition-all shadow-lg shadow-primary-900/30"
+              >
+                Analizar Grabación de Micrófono 🎸
+              </button>
+            </div>
           )}
         </div>
       )}

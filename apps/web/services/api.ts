@@ -202,3 +202,33 @@ export async function transposeChords(
 
   return response.json();
 }
+
+/**
+ * Busca y sincroniza la letra de una canción con los acordes detectados.
+ */
+export async function syncLyrics(
+  trackName: string,
+  artistName: string | undefined,
+  duration: number,
+  chords: import("@/types/song").ChordItem[]
+): Promise<import("@/types/song").LyricsResult> {
+  const response = await fetch(`${API_BASE_URL}/api/songs/sync-lyrics`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      track_name: trackName,
+      artist_name: artistName || undefined,
+      duration,
+      chords,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.detail || "Error al sincronizar letra");
+  }
+
+  return response.json();
+}
