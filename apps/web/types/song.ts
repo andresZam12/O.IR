@@ -50,6 +50,7 @@ export interface ProcessedSongResult {
   estimated_key?: string | null;
   lyrics?: LyricsResult;
   difficulty?: DifficultyEvaluation;
+  audio_url?: string | null;
 }
 
 export interface SongJobResponse {

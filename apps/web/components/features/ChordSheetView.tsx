@@ -44,18 +44,24 @@ export default function ChordSheetView({
       if (firstLineTime > 4.0) {
         const introChords = chords.filter((c) => c.time < firstLineTime);
         if (introChords.length > 0) {
-          const chordText = introChords
-            .map((c) => getChordDisplay(c.chord).padEnd(16, " "))
-            .join("");
+          const distinctIntro: string[] = [];
+          introChords.forEach((c) => {
+            const name = getChordDisplay(c.chord);
+            if (distinctIntro.length === 0 || distinctIntro[distinctIntro.length - 1] !== name) {
+              distinctIntro.push(name);
+            }
+          });
+          const displayIntro = distinctIntro.slice(0, 4);
+          const chordText = displayIntro.map((c) => c.padEnd(16, " ")).join("");
           formatted.push({
             chordLine: `   ${chordText.trimEnd()}`,
-            lyricLine: `[INTRO INSTRUMENTAL]   ${introChords.map((c) => getChordDisplay(c.chord)).join("  -  ")}`,
+            lyricLine: `[INTRO INSTRUMENTAL]   ${displayIntro.join("  -  ")}`,
             time: 0.0,
           });
         }
       }
 
-      // 2. Mapear cada verso de la letra con sus acordes exactos
+      // 2. Mapear cada verso de la letra con sus acordes simplificados para principiantes
       lines.forEach((line, idx) => {
         const lineStart = line.time;
         const nextLineStart = lines[idx + 1]?.time || lineStart + 6;
@@ -84,34 +90,50 @@ export default function ChordSheetView({
           }
         }
 
+        // Simplificación para principiantes: desduplicar y conservar máximo 2 acordes estructurales por línea
+        const distinctChords: ChordItem[] = [];
+        activeChords.forEach((c) => {
+          if (
+            distinctChords.length === 0 ||
+            distinctChords[distinctChords.length - 1].chord !== c.chord
+          ) {
+            distinctChords.push(c);
+          }
+        });
+
+        let simplifiedChords = distinctChords;
+        if (simplifiedChords.length > 2) {
+          simplifiedChords = [simplifiedChords[0], simplifiedChords[simplifiedChords.length - 1]];
+        }
+
         // Construir la línea de acordes alineada sobre las palabras
         const chordLineChars = new Array(Math.max(text.length, 36)).fill(" ");
 
-        if (activeChords.length === 1) {
-          const chordName = getChordDisplay(activeChords[0].chord);
-          const insertPos = Math.min(4, Math.max(0, text.length - chordName.length));
+        if (simplifiedChords.length === 1) {
+          const chordName = getChordDisplay(simplifiedChords[0].chord);
+          const insertPos = Math.min(2, Math.max(0, text.length - chordName.length));
           for (let i = 0; i < chordName.length; i++) {
             chordLineChars[insertPos + i] = chordName[i];
           }
-        } else {
-          activeChords.forEach((c, cIdx) => {
-            const chordName = getChordDisplay(c.chord);
-            const ratio = Math.max(0, Math.min(0.85, (c.time - lineStart) / lineDuration));
-            let insertPos = Math.floor(ratio * text.length);
+        } else if (simplifiedChords.length >= 2) {
+          const chord1 = getChordDisplay(simplifiedChords[0].chord);
+          const chord2 = getChordDisplay(simplifiedChords[1].chord);
 
-            // Evitar solapamientos entre acordes cercanos
-            if (cIdx > 0) {
-              const prevRatio = Math.max(0, (activeChords[cIdx - 1].time - lineStart) / lineDuration);
-              const prevChordEnd = Math.floor(prevRatio * text.length) + getChordDisplay(activeChords[cIdx - 1].chord).length + 2;
-              if (insertPos < prevChordEnd) insertPos = prevChordEnd;
-            }
+          // Primer acorde al inicio de la frase
+          for (let i = 0; i < chord1.length; i++) {
+            chordLineChars[i] = chord1[i];
+          }
 
-            for (let i = 0; i < chordName.length; i++) {
-              if (insertPos + i < chordLineChars.length) {
-                chordLineChars[insertPos + i] = chordName[i];
-              }
+          // Segundo acorde colocado holgadamente a mitad de la frase o donde caiga el cambio armónico
+          const ratio = Math.max(0.4, Math.min(0.75, (simplifiedChords[1].time - lineStart) / lineDuration));
+          let pos2 = Math.floor(ratio * text.length);
+          if (pos2 < chord1.length + 6) pos2 = chord1.length + 6;
+
+          for (let i = 0; i < chord2.length; i++) {
+            if (pos2 + i < chordLineChars.length) {
+              chordLineChars[pos2 + i] = chord2[i];
             }
-          });
+          }
         }
 
         formatted.push({
@@ -139,14 +161,25 @@ export default function ChordSheetView({
     let secIdx = 0;
     const generated: FormattedLine[] = [];
 
-    for (let i = 0; i < chords.length; i += step) {
-      const chunk = chords.slice(i, i + step);
+    // Desduplicar acordes consecutivos
+    const distinctGlobalChords: ChordItem[] = [];
+    chords.forEach((c) => {
+      if (
+        distinctGlobalChords.length === 0 ||
+        distinctGlobalChords[distinctGlobalChords.length - 1].chord !== c.chord
+      ) {
+        distinctGlobalChords.push(c);
+      }
+    });
+
+    for (let i = 0; i < distinctGlobalChords.length; i += step) {
+      const chunk = distinctGlobalChords.slice(i, i + step);
       const startT = chunk[0].time;
       const currentSec = sectionNames[secIdx % sectionNames.length];
       if (i > 0 && i % (step * 2) === 0) secIdx++;
 
       // Formatear acordes arriba y frase abajo
-      const chordText = chunk.map((c) => getChordDisplay(c.chord).padEnd(16, " ")).join("");
+      const chordText = chunk.map((c) => getChordDisplay(c.chord).padEnd(20, " ")).join("");
       const phraseText = `[${currentSec}]   ` + chunk.map((c) => getChordDisplay(c.chord)).join("  -  ");
 
       generated.push({

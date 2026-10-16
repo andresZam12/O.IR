@@ -6,7 +6,7 @@ import { processSongUrl, uploadAudioFile } from "@/services/api";
 type InputMode = "youtube" | "upload" | "microphone";
 
 interface SongInputFormProps {
-  onJobStarted: (jobId: string) => void;
+  onJobStarted: (jobId: string, audioUrl?: string) => void;
   onError: (errorMessage: string) => void;
   isProcessing: boolean;
 }
@@ -62,12 +62,13 @@ export default function SongInputForm({
 
     try {
       setIsSubmitting(true);
+      const localAudioUrl = URL.createObjectURL(selectedFile);
       const response = await uploadAudioFile(
         selectedFile,
         uploadSongTitle,
         uploadArtistName
       );
-      onJobStarted(response.job_id);
+      onJobStarted(response.job_id, localAudioUrl);
     } catch (err: unknown) {
       onError(err instanceof Error ? err.message : "Error al subir el archivo");
     } finally {

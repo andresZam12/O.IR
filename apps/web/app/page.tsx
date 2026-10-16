@@ -20,6 +20,7 @@ export default function HomePage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [transposeMap, setTransposeMap] = useState<Record<string, string>>({});
   const [resultTab, setResultTab] = useState<"chordsheet" | "karaoke">("chordsheet");
+  const [audioUrl, setAudioUrl] = useState<string | null>(null);
 
   // Acordes actualizados en tiempo real según la transposición elegida
   const displayChords = useMemo(() => {
@@ -32,8 +33,9 @@ export default function HomePage() {
   }, [processedData?.chords, transposeMap]);
 
   // Iniciar flujo de procesamiento y polling continuo
-  const handleJobStarted = async (id: string) => {
+  const handleJobStarted = async (id: string, localAudioUrl?: string) => {
     setJobId(id);
+    setAudioUrl(localAudioUrl || null);
     setErrorMessage(null);
     setProcessedData(null);
     setTransposeMap({});
@@ -59,6 +61,7 @@ export default function HomePage() {
     setProcessedData(null);
     setErrorMessage(null);
     setTransposeMap({});
+    setAudioUrl(null);
   };
 
   return (
@@ -202,6 +205,12 @@ export default function HomePage() {
               lyrics={processedData.lyrics}
               duration={processedData.duration}
               estimatedKey={processedData.estimated_key}
+              audioUrl={
+                audioUrl ||
+                (processedData.audio_url
+                  ? `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}${processedData.audio_url}`
+                  : undefined)
+              }
             />
           )}
         </div>
