@@ -80,14 +80,37 @@ export default function HomePage() {
 
       {/* --- Mensaje de Error (si existe) --- */}
       {errorMessage && (
-        <div className="w-full max-w-2xl mb-6 p-4 rounded-xl bg-red-950/60 border border-red-800 text-red-200 text-sm flex items-center justify-between">
-          <span>⚠️ {errorMessage}</span>
-          <button
-            onClick={() => setErrorMessage(null)}
-            className="text-xs bg-red-900/60 hover:bg-red-800 px-2 py-1 rounded"
-          >
-            Cerrar
-          </button>
+        <div className="w-full max-w-2xl mb-6 p-4 rounded-xl bg-red-950/60 border border-red-800 text-red-200 text-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <span>⚠️</span>
+            <span>
+              {errorMessage.toLowerCase().includes("bot") ||
+              errorMessage.toLowerCase().includes("sign in") ||
+              errorMessage.toLowerCase().includes("cookies")
+                ? "YouTube bloqueó la descarga en el servidor por políticas de bots. Usa el convertidor a MP3 y sube el archivo en 'Subir Audio'."
+                : errorMessage}
+            </span>
+          </div>
+          <div className="flex items-center gap-2 self-end sm:self-auto">
+            {(errorMessage.toLowerCase().includes("bot") ||
+              errorMessage.toLowerCase().includes("sign in") ||
+              errorMessage.toLowerCase().includes("cookies")) && (
+              <a
+                href="https://cobalt.tools"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold px-3 py-1.5 rounded transition-colors whitespace-nowrap"
+              >
+                📥 Convertidor MP3
+              </a>
+            )}
+            <button
+              onClick={() => setErrorMessage(null)}
+              className="text-xs bg-red-900/60 hover:bg-red-800 px-2 py-1.5 rounded transition-colors whitespace-nowrap"
+            >
+              Cerrar
+            </button>
+          </div>
         </div>
       )}
 
