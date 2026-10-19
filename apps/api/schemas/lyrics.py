@@ -37,8 +37,8 @@ class LyricsResult(BaseModel):
     )
     source: str = Field(
         ...,
-        description="Origen de la letra: 'lrclib', 'whisper' o 'not_found'",
-        examples=["lrclib"],
+        description="Origen de la letra: 'lrclib', 'gemini', 'lyrics_ovh' o 'not_found'",
+        examples=["lrclib", "gemini"],
     )
     lines: list[LyricLine] = Field(
         default_factory=list,

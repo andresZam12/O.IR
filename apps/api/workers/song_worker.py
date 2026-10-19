@@ -85,6 +85,30 @@ def execute_song_pipeline(
         )
     )
 
+    # Fallback automático universal con Google Gemini AI si no existe en la base de datos abierta:
+    if not lyrics_result or not lyrics_result.lines:
+        try:
+            from services.gemini_service import GeminiLyricsService
+
+            gemini_svc = GeminiLyricsService()
+            if gemini_svc.is_available:
+                task_context.update_state(
+                    state="STARTED",
+                    meta={"progress": 70, "step": "transcribiendo_con_gemini_ai"},
+                )
+                gemini_res = asyncio.run(
+                    gemini_svc.transcribe_audio(
+                        audio_path=effective_audio_path,
+                        hint_title=effective_title,
+                        hint_artist=effective_artist,
+                        duration=chord_result.duration,
+                    )
+                )
+                if gemini_res and gemini_res.lines:
+                    lyrics_result = gemini_res
+        except Exception as e:
+            logger.warning(f"Error en transcripción con Gemini: {e}")
+
     if lyrics_result.title:
         effective_title = lyrics_result.title
     if lyrics_result.artist:
