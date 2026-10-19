@@ -382,6 +382,47 @@ async def stream_audio_file(job_id: str):
     )
 
 
+@router.get(
+    "/download-youtube",
+    summary="Descargar directamente el audio de YouTube como archivo MP3 al navegador",
+)
+async def download_youtube_audio_endpoint(url: str):
+    """
+    Descarga el stream de audio del video de YouTube en el servidor
+    y lo envía inmediatamente al navegador como descarga de archivo MP3.
+    """
+    if not url or not url.strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Por favor proporciona una URL válida de YouTube.",
+        )
+
+    service = AudioService()
+    try:
+        download_result = service.download_youtube_audio(url.strip())
+        clean_title = re.sub(r'[^\w\s-]', '', download_result.title).strip() or "cancion_youtube"
+        download_name = f"{clean_title[:50]}.mp3"
+
+        return FileResponse(
+            path=download_result.file_path,
+            media_type="audio/mpeg",
+            filename=download_name,
+            headers={
+                "Content-Disposition": f'attachment; filename="{download_name}"'
+            },
+        )
+    except ValueError as ve:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(ve),
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error al descargar audio de YouTube: {str(e)}",
+        )
+
+
 @router.post(
     "/transpose",
     response_model=TransposeResponse,
