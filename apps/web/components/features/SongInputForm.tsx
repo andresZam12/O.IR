@@ -32,9 +32,57 @@ export default function SongInputForm({
   const [uploadArtistName, setUploadArtistName] = useState("");
   const [isDragging, setIsDragging] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [downloadingFormat, setDownloadingFormat] = useState<"mp3" | "mp4" | null>(null);
 
   // Detección automática del ID de video para el convertidor
   const detectedVideoId = extractYouTubeVideoId(youtubeUrl);
+
+  // Descarga directa a través del backend de O.IR sin sitios externos ni anuncios
+  const handleAppDownload = async (format: "mp3" | "mp4") => {
+    if (!youtubeUrl.trim() || downloadingFormat) return;
+    try {
+      setDownloadingFormat(format);
+      const apiUrl =
+        process.env.NEXT_PUBLIC_API_URL || "https://oir-api.onrender.com";
+      const targetUrl = `${apiUrl}/api/songs/download-youtube?url=${encodeURIComponent(
+        youtubeUrl.trim()
+      )}&format=${format}`;
+
+      const res = await fetch(targetUrl);
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => null);
+        throw new Error(
+          errJson?.detail ||
+            `Error al procesar la descarga en el servidor (${res.status})`
+        );
+      }
+
+      const blob = await res.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = blobUrl;
+
+      const disposition = res.headers.get("content-disposition");
+      let filename = `cancion_${detectedVideoId || "descarga"}.${format}`;
+      if (disposition && disposition.includes("filename=")) {
+        const match = disposition.match(/filename="?([^"]+)"?/);
+        if (match && match[1]) filename = match[1];
+      }
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      window.URL.revokeObjectURL(blobUrl);
+      document.body.removeChild(link);
+    } catch (err: unknown) {
+      const msg =
+        err instanceof Error
+          ? err.message
+          : "Error al descargar el archivo desde el servidor";
+      onError(msg);
+    } finally {
+      setDownloadingFormat(null);
+    }
+  };
 
   // Estados para grabación por micrófono
   const [isRecording, setIsRecording] = useState(false);
@@ -255,18 +303,18 @@ export default function SongInputForm({
                     </span>
                   </div>
                   <h4 className="text-sm font-bold text-white">
-                    Elige el formato de descarga directa:
+                    Descargar directamente a tu dispositivo:
                   </h4>
                   <p className="text-xs text-slate-400">
-                    Haz clic en cualquiera de las opciones para descargar el archivo directamente a tu equipo sin límites:
+                    Tu aplicación O.IR procesa la descarga directamente sin publicidad ni redirecciones externas:
                   </p>
                 </div>
               </div>
 
-              {/* Botones de Descarga Directa */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
-                {/* Opción 1: Descargar MP3 (Audio) */}
-                <div className="p-3.5 rounded-xl bg-slate-950/80 border border-slate-800 hover:border-emerald-500/50 transition-all flex flex-col justify-between gap-3 shadow-md">
+              {/* Botones de Descarga Directa: 1 solo botón para MP3 y 1 solo botón para MP4 */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-2">
+                {/* Botón único MP3 */}
+                <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800 hover:border-emerald-500/50 transition-all flex flex-col justify-between gap-3 shadow-md">
                   <div className="flex items-center gap-2.5">
                     <span className="text-2xl">🎵</span>
                     <div>
@@ -274,30 +322,28 @@ export default function SongInputForm({
                       <div className="text-[11px] text-slate-400">Recomendado para acordes y letra</div>
                     </div>
                   </div>
-                  <div className="flex gap-2">
-                    <a
-                      href={`https://www.y2mate.com/youtube/${detectedVideoId}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs py-2 px-3 rounded-lg text-center transition-all shadow-md flex items-center justify-center gap-1.5"
-                    >
-                      <span>📥</span>
-                      <span>Descargar MP3</span>
-                    </a>
-                    <a
-                      href={`https://www.ssyoutube.com/watch?v=${detectedVideoId}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium text-xs py-2 px-3 rounded-lg text-center transition-colors border border-slate-700"
-                      title="Servidor alternativo de descarga"
-                    >
-                      Opción 2
-                    </a>
-                  </div>
+                  <button
+                    type="button"
+                    disabled={downloadingFormat !== null}
+                    onClick={() => handleAppDownload("mp3")}
+                    className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-wait text-white font-bold text-xs py-2.5 px-3 rounded-lg text-center transition-all shadow-md flex items-center justify-center gap-2"
+                  >
+                    {downloadingFormat === "mp3" ? (
+                      <>
+                        <span className="animate-spin text-sm">⏳</span>
+                        <span>Descargando MP3 desde O.IR...</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>📥</span>
+                        <span>Descargar MP3</span>
+                      </>
+                    )}
+                  </button>
                 </div>
 
-                {/* Opción 2: Descargar MP4 (Video) */}
-                <div className="p-3.5 rounded-xl bg-slate-950/80 border border-slate-800 hover:border-blue-500/50 transition-all flex flex-col justify-between gap-3 shadow-md">
+                {/* Botón único MP4 */}
+                <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800 hover:border-blue-500/50 transition-all flex flex-col justify-between gap-3 shadow-md">
                   <div className="flex items-center gap-2.5">
                     <span className="text-2xl">🎬</span>
                     <div>
@@ -305,26 +351,24 @@ export default function SongInputForm({
                       <div className="text-[11px] text-slate-400">Video con audio completo</div>
                     </div>
                   </div>
-                  <div className="flex gap-2">
-                    <a
-                      href={`https://www.ssyoutube.com/watch?v=${detectedVideoId}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex-1 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs py-2 px-3 rounded-lg text-center transition-all shadow-md flex items-center justify-center gap-1.5"
-                    >
-                      <span>📥</span>
-                      <span>Descargar MP4</span>
-                    </a>
-                    <a
-                      href={`https://www.y2mate.com/youtube/${detectedVideoId}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium text-xs py-2 px-3 rounded-lg text-center transition-colors border border-slate-700"
-                      title="Servidor alternativo de descarga"
-                    >
-                      Opción 2
-                    </a>
-                  </div>
+                  <button
+                    type="button"
+                    disabled={downloadingFormat !== null}
+                    onClick={() => handleAppDownload("mp4")}
+                    className="w-full bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-wait text-white font-bold text-xs py-2.5 px-3 rounded-lg text-center transition-all shadow-md flex items-center justify-center gap-2"
+                  >
+                    {downloadingFormat === "mp4" ? (
+                      <>
+                        <span className="animate-spin text-sm">⏳</span>
+                        <span>Descargando MP4 desde O.IR...</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>📥</span>
+                        <span>Descargar MP4</span>
+                      </>
+                    )}
+                  </button>
                 </div>
               </div>
 
