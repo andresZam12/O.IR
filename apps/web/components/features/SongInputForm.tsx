@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useRef } from "react";
-import { processSongUrl, uploadAudioFile } from "@/services/api";
+import { uploadAudioFile } from "@/services/api";
 
 type InputMode = "youtube" | "upload" | "microphone";
 
@@ -9,6 +9,15 @@ interface SongInputFormProps {
   onJobStarted: (jobId: string, audioUrl?: string) => void;
   onError: (errorMessage: string) => void;
   isProcessing: boolean;
+}
+
+// Extrae el ID de 11 caracteres de cualquier URL de YouTube (watch, shorts, embed, youtu.be)
+function extractYouTubeVideoId(url: string): string | null {
+  if (!url) return null;
+  const match = url.trim().match(
+    /(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|shorts\/|watch\?v=|watch\?.+&v=))([\w-]{11})/
+  );
+  return match ? match[1] : null;
 }
 
 export default function SongInputForm({
@@ -23,7 +32,9 @@ export default function SongInputForm({
   const [uploadArtistName, setUploadArtistName] = useState("");
   const [isDragging, setIsDragging] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [youtubeBlocked, setYoutubeBlocked] = useState<string | null>(null);
+
+  // Detección automática del ID de video para el convertidor
+  const detectedVideoId = extractYouTubeVideoId(youtubeUrl);
 
   // Estados para grabación por micrófono
   const [isRecording, setIsRecording] = useState(false);
@@ -33,38 +44,6 @@ export default function SongInputForm({
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  // Manejo de envío de YouTube
-  const handleYoutubeSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!youtubeUrl.trim() || isSubmitting || isProcessing) {
-      if (!youtubeUrl.trim()) onError("Por favor ingresa una URL de YouTube");
-      return;
-    }
-
-    try {
-      setIsSubmitting(true);
-      setYoutubeBlocked(null);
-      const response = await processSongUrl(youtubeUrl.trim());
-      onJobStarted(response.job_id);
-    } catch (err: unknown) {
-      const msg =
-        err instanceof Error ? err.message : "Error al procesar el enlace";
-      if (
-        msg.toLowerCase().includes("bot") ||
-        msg.toLowerCase().includes("sign in") ||
-        msg.toLowerCase().includes("cookies") ||
-        msg.toLowerCase().includes("yt-dlp") ||
-        msg.toLowerCase().includes("forbidden") ||
-        msg.toLowerCase().includes("403")
-      ) {
-        setYoutubeBlocked(youtubeUrl.trim());
-      }
-      onError(msg);
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
 
   // Manejo de envío de archivo
   const handleFileSubmit = async (e: React.FormEvent) => {
@@ -175,24 +154,24 @@ export default function SongInputForm({
   return (
     <div className="card w-full max-w-2xl mx-auto shadow-2xl border-slate-800 bg-slate-900/90 backdrop-blur-md p-6">
       {/* Selector de modo (Tabs) */}
-      <div className="flex border-b border-slate-800 mb-6 pb-2 space-x-2">
+      <div className="flex border-b border-slate-800 mb-6 pb-2 space-x-2 overflow-x-auto">
         <button
           type="button"
           onClick={() => setMode("youtube")}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${
             mode === "youtube"
               ? "bg-primary-600 text-white shadow-lg shadow-primary-900/50"
               : "text-slate-400 hover:text-white hover:bg-slate-800/60"
           }`}
         >
-          <span>📺</span>
-          <span>YouTube</span>
+          <span>📥</span>
+          <span>Convertidor YouTube (MP3 / MP4)</span>
         </button>
 
         <button
           type="button"
           onClick={() => setMode("upload")}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${
             mode === "upload"
               ? "bg-primary-600 text-white shadow-lg shadow-primary-900/50"
               : "text-slate-400 hover:text-white hover:bg-slate-800/60"
@@ -205,7 +184,7 @@ export default function SongInputForm({
         <button
           type="button"
           onClick={() => setMode("microphone")}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${
             mode === "microphone"
               ? "bg-primary-600 text-white shadow-lg shadow-primary-900/50"
               : "text-slate-400 hover:text-white hover:bg-slate-800/60"
@@ -216,114 +195,172 @@ export default function SongInputForm({
         </button>
       </div>
 
-      {/* Contenido según el modo */}
+      {/* Contenido según el modo: Convertidor de YouTube a MP3/MP4 */}
       {mode === "youtube" && (
-        <form onSubmit={handleYoutubeSubmit} className="space-y-4">
+        <div className="space-y-5 animate-fade-in">
+          {/* Header informativo del convertidor */}
+          <div className="p-4 rounded-xl bg-slate-950/70 border border-slate-800 text-left space-y-2">
+            <div className="flex items-center gap-2 text-primary-400 font-semibold text-sm">
+              <span className="text-lg">📥</span>
+              <span>Convertidor Directo a MP3 y MP4</span>
+            </div>
+            <p className="text-xs text-slate-300 leading-relaxed">
+              Pega el enlace de cualquier canción o video de YouTube para descargarlo directamente en formato{" "}
+              <strong className="text-white">MP3 (audio)</strong> o{" "}
+              <strong className="text-white">MP4 (video)</strong> a tu dispositivo. Una vez descargado, pasa a la pestaña{" "}
+              <strong className="text-primary-300">Subir Audio</strong> para extraer automáticamente sus acordes y letra sincronizada con IA.
+            </p>
+          </div>
+
           <div>
             <label className="block text-sm font-medium text-slate-300 mb-2">
-              Ingresa el enlace del video o canción
+              Ingresa el enlace del video o canción de YouTube
             </label>
-            <div className="relative">
+            <div className="relative flex items-center">
               <input
                 type="url"
                 value={youtubeUrl}
                 onChange={(e) => setYoutubeUrl(e.target.value)}
-                placeholder="https://www.youtube.com/watch?v=..."
-                disabled={isProcessing}
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3.5 text-white placeholder-slate-500 focus:outline-none focus:border-primary-500 focus:ring-1 focus:ring-primary-500 transition-all text-sm"
+                placeholder="https://www.youtube.com/watch?v=... o https://youtu.be/..."
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3.5 pr-20 text-white placeholder-slate-500 focus:outline-none focus:border-primary-500 focus:ring-1 focus:ring-primary-500 transition-all text-sm font-mono"
               />
+              {youtubeUrl && (
+                <button
+                  type="button"
+                  onClick={() => setYoutubeUrl("")}
+                  className="absolute right-3 px-2 py-1 text-xs text-slate-400 hover:text-white bg-slate-800/70 hover:bg-slate-700 rounded transition-colors"
+                >
+                  Limpiar
+                </button>
+              )}
             </div>
           </div>
 
-          {/* Acceso directo a descarga y convertidor de YouTube a MP3 */}
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between text-xs px-1 text-slate-400 gap-2 bg-slate-950/60 p-2.5 rounded-lg border border-slate-800">
-            <span className="flex items-center gap-1.5">
-              <span>💡</span>
-              <span>¿Quieres descargar el MP3 directo del video?</span>
-            </span>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                disabled={!youtubeUrl.trim()}
-                onClick={() => {
-                  const apiUrl =
-                    process.env.NEXT_PUBLIC_API_URL ||
-                    "https://oir-api.onrender.com";
-                  window.open(
-                    `${apiUrl}/api/songs/download-youtube?url=${encodeURIComponent(
-                      youtubeUrl.trim()
-                    )}`,
-                    "_blank"
-                  );
-                }}
-                className="text-amber-400 hover:text-amber-300 disabled:opacity-40 disabled:cursor-not-allowed font-semibold flex items-center gap-1 bg-amber-500/10 px-2.5 py-1 rounded border border-amber-500/30 transition-colors"
-              >
-                <span>📥 Descargar MP3 directo</span>
-              </button>
-            </div>
-          </div>
-
-          <button
-            type="submit"
-            disabled={isProcessing || !youtubeUrl.trim()}
-            className="w-full bg-primary-600 hover:bg-primary-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-3.5 px-6 rounded-xl transition-all shadow-lg shadow-primary-900/30 flex items-center justify-center gap-2"
-          >
-            {isProcessing ? "Procesando..." : "Analizar canción 🎵"}
-          </button>
-
-          {/* Tarjeta de rescate si YouTube bloqueó la descarga en la nube */}
-          {youtubeBlocked && (
-            <div className="p-4 rounded-xl bg-amber-950/40 border border-amber-500/40 space-y-3 mt-4 text-left animate-fade-in">
-              <div className="flex items-start gap-3">
-                <span className="text-2xl mt-0.5">⚠️</span>
-                <div className="flex-1">
-                  <h4 className="text-sm font-bold text-amber-300">
-                    Descarga directa de audio del video
+          {/* Si se detectó un video de YouTube válido */}
+          {detectedVideoId ? (
+            <div className="p-4 rounded-xl bg-slate-900/95 border border-primary-500/40 space-y-4 text-left shadow-xl animate-fade-in">
+              <div className="flex flex-col sm:flex-row items-center gap-4">
+                <img
+                  src={`https://img.youtube.com/vi/${detectedVideoId}/mqdefault.jpg`}
+                  alt="Vista previa del video"
+                  className="w-full sm:w-44 h-28 object-cover rounded-lg border border-slate-700 shadow-md flex-shrink-0"
+                />
+                <div className="flex-1 min-w-0 space-y-1.5 w-full">
+                  <div className="flex items-center gap-2">
+                    <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                      ✓ Video detectado
+                    </span>
+                    <span className="text-xs text-slate-400 font-mono truncate">
+                      ID: {detectedVideoId}
+                    </span>
+                  </div>
+                  <h4 className="text-sm font-bold text-white">
+                    Elige el formato de descarga directa:
                   </h4>
-                  <p className="text-xs text-slate-300 mt-1 leading-relaxed">
-                    Si el análisis automático en la nube experimenta restricciones de YouTube, descarga el archivo de audio directamente en tu equipo con 1 clic y súbelo a continuación:
+                  <p className="text-xs text-slate-400">
+                    Haz clic en cualquiera de las opciones para descargar el archivo directamente a tu equipo sin límites:
                   </p>
                 </div>
               </div>
 
-              <div className="flex flex-col sm:flex-row gap-2 pt-1">
-                <a
-                  href={`${
-                    process.env.NEXT_PUBLIC_API_URL ||
-                    "https://oir-api.onrender.com"
-                  }/api/songs/download-youtube?url=${encodeURIComponent(
-                    youtubeBlocked
-                  )}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex-1 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs py-2.5 px-3 rounded-lg text-center transition-all shadow-md flex items-center justify-center gap-1.5"
-                >
-                  <span>📥</span>
-                  <span>Descarga Directa de Audio (.MP3)</span>
-                </a>
-                <a
-                  href="https://y2mate.nu/es-mp3/"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs py-2.5 px-3 rounded-lg text-center transition-colors flex items-center justify-center gap-1 border border-slate-700"
-                >
-                  <span>Convertidor Web (Y2Mate)</span>
-                </a>
+              {/* Botones de Descarga Directa */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+                {/* Opción 1: Descargar MP3 (Audio) */}
+                <div className="p-3.5 rounded-xl bg-slate-950/80 border border-slate-800 hover:border-emerald-500/50 transition-all flex flex-col justify-between gap-3 shadow-md">
+                  <div className="flex items-center gap-2.5">
+                    <span className="text-2xl">🎵</span>
+                    <div>
+                      <div className="text-xs font-bold text-white">Audio en MP3</div>
+                      <div className="text-[11px] text-slate-400">Recomendado para acordes y letra</div>
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <a
+                      href={`https://www.y2mate.com/youtube/${detectedVideoId}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs py-2 px-3 rounded-lg text-center transition-all shadow-md flex items-center justify-center gap-1.5"
+                    >
+                      <span>📥</span>
+                      <span>Descargar MP3</span>
+                    </a>
+                    <a
+                      href={`https://www.ssyoutube.com/watch?v=${detectedVideoId}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium text-xs py-2 px-3 rounded-lg text-center transition-colors border border-slate-700"
+                      title="Servidor alternativo de descarga"
+                    >
+                      Opción 2
+                    </a>
+                  </div>
+                </div>
+
+                {/* Opción 2: Descargar MP4 (Video) */}
+                <div className="p-3.5 rounded-xl bg-slate-950/80 border border-slate-800 hover:border-blue-500/50 transition-all flex flex-col justify-between gap-3 shadow-md">
+                  <div className="flex items-center gap-2.5">
+                    <span className="text-2xl">🎬</span>
+                    <div>
+                      <div className="text-xs font-bold text-white">Video en MP4</div>
+                      <div className="text-[11px] text-slate-400">Video con audio completo</div>
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <a
+                      href={`https://www.ssyoutube.com/watch?v=${detectedVideoId}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex-1 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs py-2 px-3 rounded-lg text-center transition-all shadow-md flex items-center justify-center gap-1.5"
+                    >
+                      <span>📥</span>
+                      <span>Descargar MP4</span>
+                    </a>
+                    <a
+                      href={`https://www.y2mate.com/youtube/${detectedVideoId}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium text-xs py-2 px-3 rounded-lg text-center transition-colors border border-slate-700"
+                      title="Servidor alternativo de descarga"
+                    >
+                      Opción 2
+                    </a>
+                  </div>
+                </div>
+              </div>
+
+              {/* Paso 2: Ir a Subir Audio */}
+              <div className="pt-3 border-t border-slate-800/80 flex flex-col sm:flex-row items-center justify-between gap-3 bg-primary-950/30 -mx-4 -mb-4 p-4 rounded-b-xl">
+                <div className="flex items-center gap-2.5 text-left">
+                  <span className="text-2xl">✨</span>
+                  <div>
+                    <div className="text-xs font-bold text-white">
+                      ¿Ya descargaste tu archivo MP3?
+                    </div>
+                    <div className="text-[11px] text-slate-400">
+                      Cárgalo en O.IR para detectar automáticamente acordes y letra sincronizada con IA
+                    </div>
+                  </div>
+                </div>
                 <button
                   type="button"
-                  onClick={() => {
-                    setMode("upload");
-                    setYoutubeBlocked(null);
-                  }}
-                  className="bg-primary-600 hover:bg-primary-500 text-white font-semibold text-xs py-2.5 px-3 rounded-lg text-center transition-colors flex items-center justify-center gap-1"
+                  onClick={() => setMode("upload")}
+                  className="w-full sm:w-auto bg-primary-600 hover:bg-primary-500 text-white font-semibold text-xs py-2.5 px-4 rounded-lg transition-all shadow-lg shadow-primary-900/40 flex items-center justify-center gap-1.5 flex-shrink-0"
                 >
                   <span>📁</span>
-                  <span>Ir a Subir Audio</span>
+                  <span>Ir a Subir Audio ➔</span>
                 </button>
               </div>
             </div>
+          ) : (
+            /* Estado inicial cuando no se ha pegado un link */
+            <div className="p-6 rounded-xl bg-slate-950/40 border border-dashed border-slate-800 text-center space-y-3">
+              <span className="text-3xl block">🎵 ➔ 💾</span>
+              <p className="text-xs text-slate-400 max-w-md mx-auto leading-relaxed">
+                Pega cualquier enlace de YouTube arriba para desbloquear al instante los enlaces de descarga directa en formato MP3 o MP4.
+              </p>
+            </div>
           )}
-        </form>
+        </div>
       )}
 
       {mode === "upload" && (
