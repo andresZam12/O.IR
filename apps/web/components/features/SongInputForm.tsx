@@ -32,21 +32,21 @@ export default function SongInputForm({
   const [uploadArtistName, setUploadArtistName] = useState("");
   const [isDragging, setIsDragging] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [downloadingFormat, setDownloadingFormat] = useState<"mp3" | "mp4" | null>(null);
+  const [isDownloadingMp3, setIsDownloadingMp3] = useState(false);
 
   // Detección automática del ID de video para el convertidor
   const detectedVideoId = extractYouTubeVideoId(youtubeUrl);
 
-  // Descarga directa a través del backend de O.IR sin sitios externos ni anuncios
-  const handleAppDownload = async (format: "mp3" | "mp4") => {
-    if (!youtubeUrl.trim() || downloadingFormat) return;
+  // Descarga directa a través del backend de O.IR en formato MP3 sin sitios externos ni anuncios
+  const handleDownloadMp3 = async () => {
+    if (!youtubeUrl.trim() || isDownloadingMp3) return;
     try {
-      setDownloadingFormat(format);
+      setIsDownloadingMp3(true);
       const apiUrl =
         process.env.NEXT_PUBLIC_API_URL || "https://oir-api.onrender.com";
       const targetUrl = `${apiUrl}/api/songs/download-youtube?url=${encodeURIComponent(
         youtubeUrl.trim()
-      )}&format=${format}`;
+      )}&format=mp3`;
 
       const res = await fetch(targetUrl);
       if (!res.ok) {
@@ -63,7 +63,7 @@ export default function SongInputForm({
       link.href = blobUrl;
 
       const disposition = res.headers.get("content-disposition");
-      let filename = `cancion_${detectedVideoId || "descarga"}.${format}`;
+      let filename = `cancion_${detectedVideoId || "audio"}.mp3`;
       if (disposition && disposition.includes("filename=")) {
         const match = disposition.match(/filename="?([^"]+)"?/);
         if (match && match[1]) filename = match[1];
@@ -77,10 +77,10 @@ export default function SongInputForm({
       const msg =
         err instanceof Error
           ? err.message
-          : "Error al descargar el archivo desde el servidor";
+          : "Error al descargar el archivo MP3 desde el servidor";
       onError(msg);
     } finally {
-      setDownloadingFormat(null);
+      setIsDownloadingMp3(false);
     }
   };
 
@@ -213,7 +213,7 @@ export default function SongInputForm({
           }`}
         >
           <span>📥</span>
-          <span>Convertidor YouTube (MP3 / MP4)</span>
+          <span>Convertidor YouTube a MP3</span>
         </button>
 
         <button
@@ -243,19 +243,18 @@ export default function SongInputForm({
         </button>
       </div>
 
-      {/* Contenido según el modo: Convertidor de YouTube a MP3/MP4 */}
+      {/* Contenido según el modo: Convertidor de YouTube a MP3 */}
       {mode === "youtube" && (
         <div className="space-y-5 animate-fade-in">
           {/* Header informativo del convertidor */}
           <div className="p-4 rounded-xl bg-slate-950/70 border border-slate-800 text-left space-y-2">
             <div className="flex items-center gap-2 text-primary-400 font-semibold text-sm">
               <span className="text-lg">📥</span>
-              <span>Convertidor Directo a MP3 y MP4</span>
+              <span>Convertidor Directo a MP3</span>
             </div>
             <p className="text-xs text-slate-300 leading-relaxed">
-              Pega el enlace de cualquier canción o video de YouTube para descargarlo directamente en formato{" "}
-              <strong className="text-white">MP3 (audio)</strong> o{" "}
-              <strong className="text-white">MP4 (video)</strong> a tu dispositivo. Una vez descargado, pasa a la pestaña{" "}
+              Pega el enlace de cualquier canción o video de YouTube para descargar directamente el archivo de audio en formato{" "}
+              <strong className="text-white">MP3</strong> a tu dispositivo. Una vez descargado, pasa a la pestaña{" "}
               <strong className="text-primary-300">Subir Audio</strong> para extraer automáticamente sus acordes y letra sincronizada con IA.
             </p>
           </div>
@@ -303,32 +302,31 @@ export default function SongInputForm({
                     </span>
                   </div>
                   <h4 className="text-sm font-bold text-white">
-                    Descargar directamente a tu dispositivo:
+                    Descargar audio MP3 a tu dispositivo:
                   </h4>
                   <p className="text-xs text-slate-400">
-                    Tu aplicación O.IR procesa la descarga directamente sin publicidad ni redirecciones externas:
+                    Tu aplicación O.IR procesa la descarga del archivo MP3 directamente sin publicidad ni redirecciones externas:
                   </p>
                 </div>
               </div>
 
-              {/* Botones de Descarga Directa: 1 solo botón para MP3 y 1 solo botón para MP4 */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-2">
-                {/* Botón único MP3 */}
-                <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800 hover:border-emerald-500/50 transition-all flex flex-col justify-between gap-3 shadow-md">
-                  <div className="flex items-center gap-2.5">
-                    <span className="text-2xl">🎵</span>
+              {/* Botón único de Descarga Directa a MP3 */}
+              <div className="pt-2">
+                <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800 hover:border-emerald-500/50 transition-all flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-md">
+                  <div className="flex items-center gap-3">
+                    <span className="text-3xl">🎵</span>
                     <div>
-                      <div className="text-xs font-bold text-white">Audio en MP3</div>
-                      <div className="text-[11px] text-slate-400">Recomendado para acordes y letra</div>
+                      <div className="text-sm font-bold text-white">Audio en Formato MP3</div>
+                      <div className="text-xs text-slate-400">Listo para analizar acordes y letra en O.IR</div>
                     </div>
                   </div>
                   <button
                     type="button"
-                    disabled={downloadingFormat !== null}
-                    onClick={() => handleAppDownload("mp3")}
-                    className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-wait text-white font-bold text-xs py-2.5 px-3 rounded-lg text-center transition-all shadow-md flex items-center justify-center gap-2"
+                    disabled={isDownloadingMp3}
+                    onClick={handleDownloadMp3}
+                    className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-wait text-white font-bold text-xs sm:text-sm py-2.5 px-6 rounded-lg transition-all shadow-md flex items-center justify-center gap-2 flex-shrink-0"
                   >
-                    {downloadingFormat === "mp3" ? (
+                    {isDownloadingMp3 ? (
                       <>
                         <span className="animate-spin text-sm">⏳</span>
                         <span>Descargando MP3 desde O.IR...</span>
@@ -337,35 +335,6 @@ export default function SongInputForm({
                       <>
                         <span>📥</span>
                         <span>Descargar MP3</span>
-                      </>
-                    )}
-                  </button>
-                </div>
-
-                {/* Botón único MP4 */}
-                <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800 hover:border-blue-500/50 transition-all flex flex-col justify-between gap-3 shadow-md">
-                  <div className="flex items-center gap-2.5">
-                    <span className="text-2xl">🎬</span>
-                    <div>
-                      <div className="text-xs font-bold text-white">Video en MP4</div>
-                      <div className="text-[11px] text-slate-400">Video con audio completo</div>
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    disabled={downloadingFormat !== null}
-                    onClick={() => handleAppDownload("mp4")}
-                    className="w-full bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-wait text-white font-bold text-xs py-2.5 px-3 rounded-lg text-center transition-all shadow-md flex items-center justify-center gap-2"
-                  >
-                    {downloadingFormat === "mp4" ? (
-                      <>
-                        <span className="animate-spin text-sm">⏳</span>
-                        <span>Descargando MP4 desde O.IR...</span>
-                      </>
-                    ) : (
-                      <>
-                        <span>📥</span>
-                        <span>Descargar MP4</span>
                       </>
                     )}
                   </button>
@@ -400,7 +369,7 @@ export default function SongInputForm({
             <div className="p-6 rounded-xl bg-slate-950/40 border border-dashed border-slate-800 text-center space-y-3">
               <span className="text-3xl block">🎵 ➔ 💾</span>
               <p className="text-xs text-slate-400 max-w-md mx-auto leading-relaxed">
-                Pega cualquier enlace de YouTube arriba para desbloquear al instante los enlaces de descarga directa en formato MP3 o MP4.
+                Pega cualquier enlace de YouTube arriba para descargar directamente su pista de audio en formato MP3.
               </p>
             </div>
           )}
