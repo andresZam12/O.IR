@@ -384,12 +384,12 @@ async def stream_audio_file(job_id: str):
 
 @router.get(
     "/download-youtube",
-    summary="Descargar directamente el audio de YouTube como archivo MP3 al navegador",
+    summary="Descargar directamente el audio (MP3) o video (MP4) de YouTube al navegador",
 )
-async def download_youtube_audio_endpoint(url: str):
+async def download_youtube_endpoint(url: str, format: str = "mp3"):
     """
-    Descarga el stream de audio del video de YouTube en el servidor
-    y lo envía inmediatamente al navegador como descarga de archivo MP3.
+    Descarga el stream de audio (MP3) o video (MP4) del video de YouTube en el servidor
+    y lo envía inmediatamente al navegador como descarga directa de archivo.
     """
     if not url or not url.strip():
         raise HTTPException(
@@ -399,13 +399,19 @@ async def download_youtube_audio_endpoint(url: str):
 
     service = AudioService()
     try:
-        download_result = service.download_youtube_audio(url.strip())
-        clean_title = re.sub(r'[^\w\s-]', '', download_result.title).strip() or "cancion_youtube"
-        download_name = f"{clean_title[:50]}.mp3"
+        download_result = service.download_youtube_media(url.strip(), media_format=format)
+        clean_title = (
+            re.sub(r"[^\w\s-]", "", download_result.title).strip()
+            or "archivo_youtube"
+        )
+        is_video = format.lower() == "mp4"
+        ext = "mp4" if is_video else "mp3"
+        download_name = f"{clean_title[:50]}.{ext}"
+        media_type = "video/mp4" if is_video else "audio/mpeg"
 
         return FileResponse(
             path=download_result.file_path,
-            media_type="audio/mpeg",
+            media_type=media_type,
             filename=download_name,
             headers={
                 "Content-Disposition": f'attachment; filename="{download_name}"'
@@ -419,7 +425,7 @@ async def download_youtube_audio_endpoint(url: str):
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error al descargar audio de YouTube: {str(e)}",
+            detail=f"Error al descargar medio de YouTube: {str(e)}",
         )
 
 

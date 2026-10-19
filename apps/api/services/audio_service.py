@@ -67,6 +67,18 @@ class AudioService:
         output_template = os.path.join(self.DOWNLOAD_DIR, f"{unique_id}.%(ext)s")
 
         # Limpiar la URL para asegurar que solo se descargue el video individual (descartar playlists y mixes automáticos)
+        return self.download_youtube_media(youtube_url=youtube_url, media_format="mp3")
+
+    def download_youtube_media(
+        self, youtube_url: str, media_format: str = "mp3"
+    ) -> AudioDownloadResult:
+        """
+        Descarga el stream de audio (MP3) o video (MP4) de YouTube usando yt-dlp
+        con bypass de cliente móvil para evitar bloqueos antibot.
+        """
+        unique_id = str(uuid.uuid4())
+        output_template = os.path.join(self.DOWNLOAD_DIR, f"{unique_id}.%(ext)s")
+
         clean_url = youtube_url.strip()
         match = re.search(r"(?:v=|\/embed\/|\.be\/)([\w\-]{11})", clean_url)
         if match:
@@ -83,16 +95,25 @@ class AudioService:
             except Exception:
                 pass
 
+        is_video = media_format.lower() == "mp4"
+        format_spec = "best[ext=mp4]/best" if is_video else "ba[ext=m4a]/ba/b/bestaudio/best"
+
         ydl_opts = {
-            "format": "ba[ext=m4a]/ba/b/bestaudio/best",
+            "format": format_spec,
             "outtmpl": output_template,
             "quiet": True,
             "no_warnings": True,
             "noplaylist": True,
             "socket_timeout": 30,
             "retries": 5,
-            # Evitar descargar videos excesivamente largos
-            "max_filesize": 50 * 1024 * 1024,  # 50 MB
+            # Evitar descargar videos excesivamente largos (50MB audio, 100MB video)
+            "max_filesize": 100 * 1024 * 1024 if is_video else 50 * 1024 * 1024,
+            # Bypass antibot de YouTube mediante cliente Android
+            "extractor_args": {
+                "youtube": {
+                    "player_client": ["android", "ios", "mweb"],
+                }
+            },
         }
 
         if cookie_path and os.path.exists(cookie_path):
@@ -107,17 +128,18 @@ class AudioService:
                 duration = float(info.get("duration", 0.0))
                 if duration > settings.max_audio_duration:
                     raise ValueError(
-                        f"El audio dura {int(duration)} segundos. El límite máximo es de {settings.max_audio_duration}s (5 minutos)."
+                        f"El medio dura {int(duration)} segundos. El límite máximo es de {settings.max_audio_duration}s (5 minutos)."
                     )
 
-                title = info.get("title", "Canción de YouTube")
+                title = info.get("title", "Video de YouTube" if is_video else "Canción de YouTube")
                 artist = info.get("uploader") or info.get("channel") or info.get("artist")
 
-                expected_file = os.path.join(self.DOWNLOAD_DIR, f"{unique_id}.mp3")
+                target_ext = ".mp4" if is_video else ".mp3"
+                expected_file = os.path.join(self.DOWNLOAD_DIR, f"{unique_id}{target_ext}")
 
-                # Si el archivo no es .mp3, buscar entre las extensiones comunes descargadas
+                # Si el archivo tiene otra extensión de contenedor descargada
                 if not os.path.exists(expected_file):
-                    for ext in [".m4a", ".mp4", ".webm", ".opus", ".wav"]:
+                    for ext in [".m4a", ".mp4", ".webm", ".opus", ".wav", ".mkv"]:
                         candidate = os.path.join(self.DOWNLOAD_DIR, f"{unique_id}{ext}")
                         if os.path.exists(candidate):
                             expected_file = candidate
@@ -140,7 +162,7 @@ class AudioService:
                     "YouTube ha limitado la descarga desde servidores en la nube para este video. "
                     "Te sugerimos usar la pestaña 'Subir Archivo' (.mp3 o .wav) o la opción de micrófono para procesarlo al instante."
                 )
-            raise RuntimeError(f"Error al descargar audio de YouTube: {err_msg}")
+            raise RuntimeError(f"Error al descargar medio de YouTube: {err_msg}")
 
     def cleanup_file(self, file_path: str) -> None:
         """Elimina un archivo temporal de audio una vez procesado."""
