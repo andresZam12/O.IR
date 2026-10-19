@@ -50,6 +50,11 @@ export default function SongInputForm({
 
       const res = await fetch(targetUrl);
       if (!res.ok) {
+        if (res.status === 404) {
+          throw new Error(
+            "El servidor en la nube (Render) aún está compilando el nuevo endpoint de descarga. Ve a tu panel en https://dashboard.render.com y pulsa 'Manual Deploy' > 'Deploy latest commit', o espera a que finalice el despliegue."
+          );
+        }
         const errJson = await res.json().catch(() => null);
         throw new Error(
           errJson?.detail ||
