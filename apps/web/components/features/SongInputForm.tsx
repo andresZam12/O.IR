@@ -23,6 +23,7 @@ export default function SongInputForm({
   const [uploadArtistName, setUploadArtistName] = useState("");
   const [isDragging, setIsDragging] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [youtubeBlocked, setYoutubeBlocked] = useState<string | null>(null);
 
   // Estados para grabación por micrófono
   const [isRecording, setIsRecording] = useState(false);
@@ -43,10 +44,23 @@ export default function SongInputForm({
 
     try {
       setIsSubmitting(true);
+      setYoutubeBlocked(null);
       const response = await processSongUrl(youtubeUrl.trim());
       onJobStarted(response.job_id);
     } catch (err: unknown) {
-      onError(err instanceof Error ? err.message : "Error al procesar el enlace");
+      const msg =
+        err instanceof Error ? err.message : "Error al procesar el enlace";
+      if (
+        msg.toLowerCase().includes("bot") ||
+        msg.toLowerCase().includes("sign in") ||
+        msg.toLowerCase().includes("cookies") ||
+        msg.toLowerCase().includes("yt-dlp") ||
+        msg.toLowerCase().includes("forbidden") ||
+        msg.toLowerCase().includes("403")
+      ) {
+        setYoutubeBlocked(youtubeUrl.trim());
+      }
+      onError(msg);
     } finally {
       setIsSubmitting(false);
     }
@@ -220,6 +234,28 @@ export default function SongInputForm({
               />
             </div>
           </div>
+
+          {/* Acceso directo a convertidor de YouTube a MP3 */}
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between text-xs px-1 text-slate-400 gap-2 bg-slate-950/60 p-2.5 rounded-lg border border-slate-800">
+            <span className="flex items-center gap-1.5">
+              <span>💡</span>
+              <span>¿Quieres descargar el MP3 directo del video?</span>
+            </span>
+            <a
+              href={
+                youtubeUrl.trim()
+                  ? `https://cobalt.tools/?u=${encodeURIComponent(youtubeUrl.trim())}`
+                  : "https://cobalt.tools"
+              }
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-amber-400 hover:text-amber-300 hover:underline font-semibold flex items-center gap-1 bg-amber-500/10 px-2.5 py-1 rounded border border-amber-500/30 transition-colors"
+            >
+              <span>📥 Convertidor a MP3 (Cobalt)</span>
+              <span>↗</span>
+            </a>
+          </div>
+
           <button
             type="submit"
             disabled={isProcessing || !youtubeUrl.trim()}
@@ -227,6 +263,55 @@ export default function SongInputForm({
           >
             {isProcessing ? "Procesando..." : "Analizar canción 🎵"}
           </button>
+
+          {/* Tarjeta de rescate si YouTube bloqueó la descarga en la nube */}
+          {youtubeBlocked && (
+            <div className="p-4 rounded-xl bg-amber-950/40 border border-amber-500/40 space-y-3 mt-4 text-left animate-fade-in">
+              <div className="flex items-start gap-3">
+                <span className="text-2xl mt-0.5">⚠️</span>
+                <div className="flex-1">
+                  <h4 className="text-sm font-bold text-amber-300">
+                    Descarga bloqueada por políticas de YouTube en la nube
+                  </h4>
+                  <p className="text-xs text-slate-300 mt-1 leading-relaxed">
+                    YouTube detectó que la petición proviene de un servidor en la nube y bloqueó la descarga automática.
+                    ¡No te preocupes! Puedes descargar el audio directamente desde tu navegador en 1 clic y analizarlo al instante:
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex flex-col sm:flex-row gap-2 pt-1">
+                <a
+                  href={`https://cobalt.tools/?u=${encodeURIComponent(youtubeBlocked)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex-1 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs py-2.5 px-3 rounded-lg text-center transition-all shadow-md flex items-center justify-center gap-1.5"
+                >
+                  <span>📥</span>
+                  <span>Descargar MP3 (Cobalt)</span>
+                </a>
+                <a
+                  href="https://y2mate.nu/es-mp3/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs py-2.5 px-3 rounded-lg text-center transition-colors flex items-center justify-center gap-1 border border-slate-700"
+                >
+                  <span>Opción 2 (Y2Mate)</span>
+                </a>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMode("upload");
+                    setYoutubeBlocked(null);
+                  }}
+                  className="bg-primary-600 hover:bg-primary-500 text-white font-semibold text-xs py-2.5 px-3 rounded-lg text-center transition-colors flex items-center justify-center gap-1"
+                >
+                  <span>📁</span>
+                  <span>Ir a Subir Audio</span>
+                </button>
+              </div>
+            </div>
+          )}
         </form>
       )}
 
