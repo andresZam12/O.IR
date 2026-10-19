@@ -5,6 +5,7 @@ Usa pydantic-settings para cargar las variables de entorno del archivo .env
 y exponerlas como un objeto tipado accesible desde cualquier parte del proyecto.
 """
 
+import os
 from typing import Any
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -25,8 +26,9 @@ class Settings(BaseSettings):
     supabase_url: str = ""
     supabase_key: str = ""
 
-    # --- Whisper ---
+    # --- Whisper / Gemini AI ---
     whisper_model: str = "base"
+    gemini_api_key: str = ""
 
     # --- Límites del sistema ---
     max_audio_duration: int = 300  # segundos
@@ -54,7 +56,10 @@ class Settings(BaseSettings):
 
     # Indicar que las variables se cargan desde el archivo .env
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=[
+            os.path.join(os.path.dirname(os.path.dirname(__file__)), ".env"),
+            ".env",
+        ],
         env_file_encoding="utf-8",
         extra="ignore",
     )

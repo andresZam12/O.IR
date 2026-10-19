@@ -24,8 +24,8 @@ tinytag>=2.0.0
 # --- Descarga de audio desde YouTube ---
 yt-dlp>=2024.5.27
 
-# --- Transcripción de letra (Whisper) ---
-openai-whisper>=20231117
+# --- Transcripción de letra por IA (Google Gemini Multimodal) ---
+google-genai>=2.3.0
 
 # --- Cliente HTTP (para llamar a LRCLIB) ---
 httpx>=0.27.0
