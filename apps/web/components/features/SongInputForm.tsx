@@ -235,25 +235,32 @@ export default function SongInputForm({
             </div>
           </div>
 
-          {/* Acceso directo a convertidor de YouTube a MP3 */}
+          {/* Acceso directo a descarga y convertidor de YouTube a MP3 */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between text-xs px-1 text-slate-400 gap-2 bg-slate-950/60 p-2.5 rounded-lg border border-slate-800">
             <span className="flex items-center gap-1.5">
               <span>💡</span>
               <span>¿Quieres descargar el MP3 directo del video?</span>
             </span>
-            <a
-              href={
-                youtubeUrl.trim()
-                  ? `https://cobalt.tools/?u=${encodeURIComponent(youtubeUrl.trim())}`
-                  : "https://cobalt.tools"
-              }
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-amber-400 hover:text-amber-300 hover:underline font-semibold flex items-center gap-1 bg-amber-500/10 px-2.5 py-1 rounded border border-amber-500/30 transition-colors"
-            >
-              <span>📥 Convertidor a MP3 (Cobalt)</span>
-              <span>↗</span>
-            </a>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                disabled={!youtubeUrl.trim()}
+                onClick={() => {
+                  const apiUrl =
+                    process.env.NEXT_PUBLIC_API_URL ||
+                    "https://oir-api.onrender.com";
+                  window.open(
+                    `${apiUrl}/api/songs/download-youtube?url=${encodeURIComponent(
+                      youtubeUrl.trim()
+                    )}`,
+                    "_blank"
+                  );
+                }}
+                className="text-amber-400 hover:text-amber-300 disabled:opacity-40 disabled:cursor-not-allowed font-semibold flex items-center gap-1 bg-amber-500/10 px-2.5 py-1 rounded border border-amber-500/30 transition-colors"
+              >
+                <span>📥 Descargar MP3 directo</span>
+              </button>
+            </div>
           </div>
 
           <button
@@ -271,24 +278,28 @@ export default function SongInputForm({
                 <span className="text-2xl mt-0.5">⚠️</span>
                 <div className="flex-1">
                   <h4 className="text-sm font-bold text-amber-300">
-                    Descarga bloqueada por políticas de YouTube en la nube
+                    Descarga directa de audio del video
                   </h4>
                   <p className="text-xs text-slate-300 mt-1 leading-relaxed">
-                    YouTube detectó que la petición proviene de un servidor en la nube y bloqueó la descarga automática.
-                    ¡No te preocupes! Puedes descargar el audio directamente desde tu navegador en 1 clic y analizarlo al instante:
+                    Si el análisis automático en la nube experimenta restricciones de YouTube, descarga el archivo de audio directamente en tu equipo con 1 clic y súbelo a continuación:
                   </p>
                 </div>
               </div>
 
               <div className="flex flex-col sm:flex-row gap-2 pt-1">
                 <a
-                  href={`https://cobalt.tools/?u=${encodeURIComponent(youtubeBlocked)}`}
+                  href={`${
+                    process.env.NEXT_PUBLIC_API_URL ||
+                    "https://oir-api.onrender.com"
+                  }/api/songs/download-youtube?url=${encodeURIComponent(
+                    youtubeBlocked
+                  )}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex-1 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs py-2.5 px-3 rounded-lg text-center transition-all shadow-md flex items-center justify-center gap-1.5"
                 >
                   <span>📥</span>
-                  <span>Descargar MP3 (Cobalt)</span>
+                  <span>Descarga Directa de Audio (.MP3)</span>
                 </a>
                 <a
                   href="https://y2mate.nu/es-mp3/"
@@ -296,7 +307,7 @@ export default function SongInputForm({
                   rel="noopener noreferrer"
                   className="bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs py-2.5 px-3 rounded-lg text-center transition-colors flex items-center justify-center gap-1 border border-slate-700"
                 >
-                  <span>Opción 2 (Y2Mate)</span>
+                  <span>Convertidor Web (Y2Mate)</span>
                 </a>
                 <button
                   type="button"
