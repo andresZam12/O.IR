@@ -24,6 +24,7 @@ from celery.result import AsyncResult
 from core.celery_app import celery_app
 from core.config import settings
 from schemas.song import (
+    ChordItem,
     SongJobResponse,
     SongJobStatus,
     SongProcessRequest,
