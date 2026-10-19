@@ -13,6 +13,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
     libsndfile1 \
     curl \
+    nodejs \
     && rm -rf /var/lib/apt/lists/*
 
 # Copiar e instalar dependencias de Python

@@ -89,19 +89,8 @@ class AudioService:
             "quiet": True,
             "no_warnings": True,
             "noplaylist": True,
-            "socket_timeout": 25,
-            "retries": 3,
-            "extractor_args": {
-                "youtube": {
-                    "player_client": ["android", "ios"],
-                }
-            },
-            "http_headers": {
-                "User-Agent": (
-                    "com.google.android.youtube/19.09.37 (Linux; U; Android 14; US) gzip"
-                ),
-                "Accept-Language": "en-US,en;q=0.9",
-            },
+            "socket_timeout": 30,
+            "retries": 5,
             # Evitar descargar videos excesivamente largos
             "max_filesize": 50 * 1024 * 1024,  # 50 MB
         }
