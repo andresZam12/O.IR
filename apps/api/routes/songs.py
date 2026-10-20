@@ -3,8 +3,10 @@ routes/songs.py — Endpoints para el procesamiento y consulta de canciones
 """
 
 import os
+import re
 import socket
 import tempfile
+import unicodedata
 import uuid
 from typing import Optional
 from urllib.parse import urlparse
@@ -31,6 +33,7 @@ from schemas.song import (
 )
 from schemas.transposition import TransposeRequest, TransposeResponse
 from services.transposition_service import TranspositionService
+from services.audio_service import AudioService
 from repositories.song_repository import SongRepository
 from workers.song_worker import execute_song_pipeline, process_song
 
