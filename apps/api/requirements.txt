@@ -22,7 +22,7 @@ ffmpeg-python>=0.2.0
 tinytag>=2.0.0
 
 # --- Descarga de audio desde YouTube ---
-yt-dlp>=2024.5.27
+yt-dlp>=2026.8.19
 
 # --- Transcripción de letra por IA (Google Gemini Multimodal) ---
 google-genai>=2.3.0
