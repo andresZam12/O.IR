@@ -31,7 +31,7 @@ class Settings(BaseSettings):
     gemini_api_key: str = ""
 
     # --- Límites del sistema ---
-    max_audio_duration: int = 300  # segundos
+    max_audio_duration: int = 600  # segundos (10 minutos para permitir canciones completas)
 
     # --- Entorno de ejecución ---
     environment: str = "development"
