@@ -38,7 +38,7 @@ export default function SongInputForm({
   const detectedVideoId = extractYouTubeVideoId(youtubeUrl);
 
   // Descarga directa a través del backend de O.IR en formato MP3 sin sitios externos ni anuncios
-  const handleDownloadMp3 = async () => {
+  const handleDownloadMp3 = () => {
     if (!youtubeUrl.trim() || isDownloadingMp3) return;
     try {
       setIsDownloadingMp3(true);
@@ -48,35 +48,14 @@ export default function SongInputForm({
         youtubeUrl.trim()
       )}&format=mp3`;
 
-      const res = await fetch(targetUrl);
-      if (!res.ok) {
-        if (res.status === 404) {
-          throw new Error(
-            "El servidor en la nube (Render) aún está compilando el nuevo endpoint de descarga. Ve a tu panel en https://dashboard.render.com y pulsa 'Manual Deploy' > 'Deploy latest commit', o espera a que finalice el despliegue."
-          );
-        }
-        const errJson = await res.json().catch(() => null);
-        throw new Error(
-          errJson?.detail ||
-            `Error al procesar la descarga en el servidor (${res.status})`
-        );
-      }
-
-      const blob = await res.blob();
-      const blobUrl = window.URL.createObjectURL(blob);
+      // Se ejecuta como descarga directa del navegador para prevenir restricciones de CORS
       const link = document.createElement("a");
-      link.href = blobUrl;
-
-      const disposition = res.headers.get("content-disposition");
-      let filename = `cancion_${detectedVideoId || "audio"}.mp3`;
-      if (disposition && disposition.includes("filename=")) {
-        const match = disposition.match(/filename="?([^"]+)"?/);
-        if (match && match[1]) filename = match[1];
-      }
-      link.download = filename;
+      link.href = targetUrl;
+      link.setAttribute("download", `cancion_${detectedVideoId || "audio"}.mp3`);
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
       document.body.appendChild(link);
       link.click();
-      window.URL.revokeObjectURL(blobUrl);
       document.body.removeChild(link);
     } catch (err: unknown) {
       const msg =
@@ -85,7 +64,7 @@ export default function SongInputForm({
           : "Error al descargar el archivo MP3 desde el servidor";
       onError(msg);
     } finally {
-      setIsDownloadingMp3(false);
+      setTimeout(() => setIsDownloadingMp3(false), 2500);
     }
   };
 
