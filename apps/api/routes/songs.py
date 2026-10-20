@@ -400,22 +400,36 @@ async def download_youtube_endpoint(url: str, format: str = "mp3"):
 
     service = AudioService()
     try:
+        import unicodedata
         download_result = service.download_youtube_media(url.strip(), media_format=format)
-        clean_title = (
-            re.sub(r"[^\w\s-]", "", download_result.title).strip()
-            or "archivo_youtube"
+        clean_ascii = (
+            unicodedata.normalize("NFKD", download_result.title)
+            .encode("ASCII", "ignore")
+            .decode("ASCII")
         )
+        clean_title = (
+            re.sub(r"[^\w\s-]", "", clean_ascii).strip()
+            or "cancion_youtube"
+        )
+        clean_title = re.sub(r"\s+", "_", clean_title)[:50]
         is_video = format.lower() == "mp4"
         ext = "mp4" if is_video else "mp3"
-        download_name = f"{clean_title[:50]}.{ext}"
+        download_name = f"{clean_title}.{ext}"
         media_type = "video/mp4" if is_video else "audio/mpeg"
+
+        if not os.path.exists(download_result.file_path):
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="El archivo descargado no se pudo encontrar en el servidor.",
+            )
 
         return FileResponse(
             path=download_result.file_path,
             media_type=media_type,
             filename=download_name,
             headers={
-                "Content-Disposition": f'attachment; filename="{download_name}"'
+                "Content-Disposition": f'attachment; filename="{download_name}"',
+                "Access-Control-Allow-Origin": "*",
             },
         )
     except ValueError as ve:

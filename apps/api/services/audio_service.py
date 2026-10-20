@@ -5,8 +5,10 @@ Implementa la descarga de pistas de audio desde URLs de YouTube mediante yt-dlp,
 extracción de metadatos (título, artista, duración) y validación de límites.
 """
 
+import glob
 import os
 import re
+import tempfile
 import uuid
 from typing import Optional
 from dataclasses import dataclass
@@ -36,9 +38,7 @@ class AudioService:
     y preprocesamiento de archivos multimedia.
     """
 
-    DOWNLOAD_DIR = os.path.join(
-        os.path.dirname(os.path.dirname(__file__)), "temp"
-    )
+    DOWNLOAD_DIR = os.path.join(tempfile.gettempdir(), "oir_downloads")
 
     def __init__(self) -> None:
         """Asegura que el directorio temporal exista."""
@@ -134,19 +134,27 @@ class AudioService:
                 title = info.get("title", "Video de YouTube" if is_video else "Canción de YouTube")
                 artist = info.get("uploader") or info.get("channel") or info.get("artist")
 
-                target_ext = ".mp4" if is_video else ".mp3"
-                expected_file = os.path.join(self.DOWNLOAD_DIR, f"{unique_id}{target_ext}")
+                # 1. Intentar con el nombre preparado por yt-dlp
+                actual_file = ydl.prepare_filename(info)
 
-                # Si el archivo tiene otra extensión de contenedor descargada
-                if not os.path.exists(expected_file):
-                    for ext in [".m4a", ".mp4", ".webm", ".opus", ".wav", ".mkv"]:
-                        candidate = os.path.join(self.DOWNLOAD_DIR, f"{unique_id}{ext}")
-                        if os.path.exists(candidate):
-                            expected_file = candidate
-                            break
+                # 2. Si no existe, buscar coincidencias de unique_id en el directorio de descargas
+                if not os.path.exists(actual_file):
+                    pattern = os.path.join(self.DOWNLOAD_DIR, f"{unique_id}*")
+                    matches = glob.glob(pattern)
+                    if matches and os.path.exists(matches[0]):
+                        actual_file = matches[0]
+                    else:
+                        for ext in [".mp3", ".m4a", ".mp4", ".webm", ".opus", ".wav", ".mkv"]:
+                            cand = os.path.join(self.DOWNLOAD_DIR, f"{unique_id}{ext}")
+                            if os.path.exists(cand):
+                                actual_file = cand
+                                break
+
+                if not os.path.exists(actual_file):
+                    raise RuntimeError("No se encontró el archivo de audio descargado en el servidor.")
 
                 return AudioDownloadResult(
-                    file_path=expected_file,
+                    file_path=actual_file,
                     title=title,
                     artist=artist,
                     duration=duration,
