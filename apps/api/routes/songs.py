@@ -441,9 +441,12 @@ async def download_youtube_endpoint(url: str, format: str = "mp3"):
             detail=str(ve),
         )
     except Exception as e:
+        msg = str(e)
+        if not msg.startswith("Error al descargar"):
+            msg = f"Error al descargar medio de YouTube: {msg}"
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error al descargar medio de YouTube: {str(e)}",
+            detail=msg,
         )
 
 
