@@ -63,4 +63,15 @@ async def root():
 @app.get("/health", tags=["health"])
 async def health_check():
     """Verificación de salud del servidor."""
-    return {"status": "ok"}
+    import sys
+    try:
+        import yt_dlp.version
+        yv = yt_dlp.version.__version__
+    except Exception as e:
+        yv = str(e)
+    return {
+        "status": "ok",
+        "build": "2026-10-21-diag",
+        "python": sys.version,
+        "yt_dlp": yv,
+    }
