@@ -15,6 +15,6 @@ services:
       - key: PORT
         value: 8000
       - key: MAX_AUDIO_DURATION
-        value: 300
+        value: 600
       - key: ALLOWED_ORIGINS
         sync: false
