@@ -48,12 +48,10 @@ export default function SongInputForm({
         youtubeUrl.trim()
       )}&format=mp3`;
 
-      // Se ejecuta como descarga directa del navegador para prevenir restricciones de CORS
+      // Se ejecuta como descarga directa en la misma ventana para evitar pestañas en blanco
       const link = document.createElement("a");
       link.href = targetUrl;
       link.setAttribute("download", `cancion_${detectedVideoId || "audio"}.mp3`);
-      link.target = "_blank";
-      link.rel = "noopener noreferrer";
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -64,7 +62,7 @@ export default function SongInputForm({
           : "Error al descargar el archivo MP3 desde el servidor";
       onError(msg);
     } finally {
-      setTimeout(() => setIsDownloadingMp3(false), 2500);
+      setTimeout(() => setIsDownloadingMp3(false), 3000);
     }
   };
 
