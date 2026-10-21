@@ -90,8 +90,10 @@ class AudioService:
         if cookie_content and not cookie_path:
             cookie_path = os.path.join(self.DOWNLOAD_DIR, "yt_cookies.txt")
             try:
+                # Normalizar saltos de línea y tabulaciones por si vienen escapados desde la consola de Render
+                normalized = cookie_content.replace("\\n", "\n").replace("\\t", "\t")
                 with open(cookie_path, "w", encoding="utf-8") as cf:
-                    cf.write(cookie_content)
+                    cf.write(normalized)
             except Exception:
                 pass
 
