@@ -63,15 +63,19 @@ async def root():
 @app.get("/health", tags=["health"])
 async def health_check():
     """Verificación de salud del servidor."""
+    import os
     import sys
     try:
         import yt_dlp.version
         yv = yt_dlp.version.__version__
     except Exception as e:
         yv = str(e)
+    cookie_str = os.getenv("YOUTUBE_COOKIES", "")
     return {
         "status": "ok",
-        "build": "2026-10-21-diag",
+        "build": "110-cookie-opt",
         "python": sys.version,
         "yt_dlp": yv,
+        "has_youtube_cookies": bool(cookie_str or os.getenv("YOUTUBE_COOKIE_PATH")),
+        "cookie_length": len(cookie_str),
     }
