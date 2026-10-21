@@ -33,6 +33,7 @@ export default function SongInputForm({
   const [isDragging, setIsDragging] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDownloadingMp3, setIsDownloadingMp3] = useState(false);
+  const [downloadSuccessMessage, setDownloadSuccessMessage] = useState<string | null>(null);
 
   // Detección automática del ID de video para el convertidor
   const detectedVideoId = extractYouTubeVideoId(youtubeUrl);
@@ -42,6 +43,7 @@ export default function SongInputForm({
     if (!youtubeUrl.trim() || isDownloadingMp3) return;
     try {
       setIsDownloadingMp3(true);
+      setDownloadSuccessMessage(null);
       const apiUrl =
         process.env.NEXT_PUBLIC_API_URL || "https://oir-api.onrender.com";
       const targetUrl = `${apiUrl}/api/songs/download-youtube?url=${encodeURIComponent(
@@ -75,6 +77,7 @@ export default function SongInputForm({
       link.click();
       document.body.removeChild(link);
       window.URL.revokeObjectURL(downloadUrl);
+      setDownloadSuccessMessage(`🎉 ¡${filename} descargado con éxito! Revisa tus descargas y pásate a 'Subir Audio'.`);
     } catch (err: unknown) {
       const msg =
         err instanceof Error
@@ -331,7 +334,7 @@ export default function SongInputForm({
                     {isDownloadingMp3 ? (
                       <>
                         <span className="animate-spin text-sm">⏳</span>
-                        <span>Descargando MP3 desde O.IR...</span>
+                        <span>Extrayendo MP3... (15-20s)</span>
                       </>
                     ) : (
                       <>
@@ -341,6 +344,23 @@ export default function SongInputForm({
                     )}
                   </button>
                 </div>
+
+                {/* Mensaje de confirmación de descarga */}
+                {downloadSuccessMessage && (
+                  <div className="mt-2 p-3 bg-emerald-950/80 border border-emerald-500/50 rounded-xl text-emerald-300 text-xs flex items-center justify-between shadow-md animate-fade-in">
+                    <div className="flex items-center gap-2">
+                      <span className="text-base">✅</span>
+                      <span>{downloadSuccessMessage}</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setDownloadSuccessMessage(null)}
+                      className="text-emerald-400 hover:text-white font-bold px-2 py-0.5 rounded text-xs ml-2"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* Paso 2: Ir a Subir Audio */}
