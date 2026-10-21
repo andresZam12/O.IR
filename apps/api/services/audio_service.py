@@ -107,19 +107,24 @@ class AudioService:
             "socket_timeout": 30,
             "retries": 3,
             "max_filesize": 100 * 1024 * 1024 if is_video else 60 * 1024 * 1024,
+            "js_runtimes": {"node": {}},
         }
 
         if cookie_path and os.path.exists(cookie_path):
             base_opts["cookiefile"] = cookie_path
 
         # Estrategias de extracción en orden de prioridad:
-        # 1. Automática (yt-dlp selecciona los mejores clientes modernos sin forzar APIs obsoletas)
+        # 1. Automática con runtime Node (descifra firmas y tokens modernos de YouTube)
         # 2. Fallback con clientes tv y web
-        # 3. Fallback con clientes ios y web
+        # 3. Fallback con cliente web directo
+        # 4. Fallback con cliente ios y web
+        # 5. Fallback con cliente android
         strategies = [
             {},
             {"extractor_args": {"youtube": {"player_client": ["tv", "web"]}}},
+            {"extractor_args": {"youtube": {"player_client": ["web"]}}},
             {"extractor_args": {"youtube": {"player_client": ["ios", "web"]}}},
+            {"extractor_args": {"youtube": {"player_client": ["android"]}}},
         ]
 
         last_error = None
