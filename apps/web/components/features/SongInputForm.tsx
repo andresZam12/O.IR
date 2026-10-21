@@ -28,8 +28,6 @@ export default function SongInputForm({
   const [mode, setMode] = useState<InputMode>("youtube");
   const [youtubeUrl, setYoutubeUrl] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [uploadSongTitle, setUploadSongTitle] = useState("");
-  const [uploadArtistName, setUploadArtistName] = useState("");
   const [isDragging, setIsDragging] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDownloadingMp3, setIsDownloadingMp3] = useState(false);
@@ -110,7 +108,7 @@ export default function SongInputForm({
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Manejo de envío de archivo
+  // Manejo de envío de archivo físico para análisis acústico
   const handleFileSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedFile || isSubmitting || isProcessing) {
@@ -121,11 +119,8 @@ export default function SongInputForm({
     try {
       setIsSubmitting(true);
       const localAudioUrl = URL.createObjectURL(selectedFile);
-      const response = await uploadAudioFile(
-        selectedFile,
-        uploadSongTitle,
-        uploadArtistName
-      );
+      // El archivo físico es el parámetro principal de análisis acústico
+      const response = await uploadAudioFile(selectedFile);
       onJobStarted(response.job_id, localAudioUrl);
     } catch (err: unknown) {
       onError(err instanceof Error ? err.message : "Error al subir el archivo");
@@ -134,20 +129,9 @@ export default function SongInputForm({
     }
   };
 
-  // Procesar archivo seleccionado y autocompletar título/artista desde el nombre del archivo
+  // Selección de archivo físico
   const handleFileChange = (file: File) => {
     setSelectedFile(file);
-    const rawName = file.name.replace(/\.[^/.]+$/, "");
-    if (rawName.includes(" - ")) {
-      const parts = rawName.split(" - ");
-      if (!uploadArtistName.trim()) setUploadArtistName(parts[0].trim());
-      if (!uploadSongTitle.trim()) setUploadSongTitle(parts.slice(1).join(" - ").trim());
-    } else {
-      if (!uploadSongTitle.trim()) {
-        const cleanTitle = rawName.replace(/[_-]/g, " ").trim();
-        setUploadSongTitle(cleanTitle);
-      }
-    }
   };
 
   // Manejo de Drag and Drop
@@ -454,35 +438,23 @@ export default function SongInputForm({
             )}
           </div>
 
-          {/* Campos opcionales pero recomendados para obtener la letra automáticamente */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-            <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">
-                Nombre de la canción (para letra con IA)
-              </label>
-              <input
-                type="text"
-                value={uploadSongTitle}
-                onChange={(e) => setUploadSongTitle(e.target.value)}
-                placeholder="Ej. Azabache, De Música Ligera..."
-                disabled={isProcessing || isSubmitting}
-                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-primary-500"
-              />
+          {/* Indicador de archivo físico y análisis acústico */}
+          {selectedFile && (
+            <div className="p-4 rounded-xl bg-slate-950/90 border border-slate-800 text-left space-y-2 animate-fade-in shadow-inner">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-emerald-400 flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                  Pista de audio lista para análisis acústico
+                </span>
+                <span className="text-[11px] font-mono text-slate-400">
+                  {(selectedFile.size / (1024 * 1024)).toFixed(2)} MB
+                </span>
+              </div>
+              <p className="text-xs text-slate-300 leading-relaxed">
+                O.IR analizará directamente la onda sonora de <strong className="text-white">{selectedFile.name}</strong> con librosa y modelos de IA musical para extraer la progresión armónica y letra sincronizada fiel a este audio físico.
+              </p>
             </div>
-            <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">
-                Artista o intérprete (opcional)
-              </label>
-              <input
-                type="text"
-                value={uploadArtistName}
-                onChange={(e) => setUploadArtistName(e.target.value)}
-                placeholder="Ej. Julio Jaramillo, Soda Stereo..."
-                disabled={isProcessing || isSubmitting}
-                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-primary-500"
-              />
-            </div>
-          </div>
+          )}
 
           <button
             type="submit"
@@ -492,8 +464,8 @@ export default function SongInputForm({
             {isSubmitting
               ? "Subiendo archivo..."
               : isProcessing
-              ? "Procesando audio..."
-              : "Subir y Analizar 🚀"}
+              ? "Analizando ondas de audio..."
+              : "Subir y Analizar Audio 🚀"}
           </button>
         </form>
       )}
@@ -534,42 +506,24 @@ export default function SongInputForm({
           </div>
 
           {selectedFile && !isRecording && (
-            <div className="space-y-4 pt-2 text-left">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">
-                    Nombre de la canción (para extraer letra completa)
-                  </label>
-                  <input
-                    type="text"
-                    value={uploadSongTitle}
-                    onChange={(e) => setUploadSongTitle(e.target.value)}
-                    placeholder="Ej. Azabache, De Música Ligera..."
-                    disabled={isProcessing || isSubmitting}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-primary-500"
-                  />
+            <div className="space-y-4 pt-2 text-left animate-fade-in">
+              <div className="p-3.5 rounded-xl bg-slate-950/80 border border-slate-800 text-left space-y-1.5">
+                <div className="flex items-center gap-2 text-xs font-semibold text-emerald-400">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                  <span>Audio capturado desde el micrófono</span>
                 </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">
-                    Artista o intérprete (opcional)
-                  </label>
-                  <input
-                    type="text"
-                    value={uploadArtistName}
-                    onChange={(e) => setUploadArtistName(e.target.value)}
-                    placeholder="Ej. Julio Jaramillo, Soda Stereo..."
-                    disabled={isProcessing || isSubmitting}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-primary-500"
-                  />
-                </div>
+                <p className="text-xs text-slate-300 leading-relaxed">
+                  Se analizará directamente la señal grabada mediante librosa e IA para extraer los acordes en vivo.
+                </p>
               </div>
+
               <button
                 type="button"
                 onClick={handleFileSubmit}
                 disabled={isProcessing}
-                className="w-full bg-primary-600 hover:bg-primary-500 disabled:opacity-50 text-white font-semibold py-3.5 px-6 rounded-xl transition-all shadow-lg shadow-primary-900/30"
+                className="w-full bg-primary-600 hover:bg-primary-500 disabled:opacity-50 text-white font-semibold py-3.5 px-6 rounded-xl transition-all shadow-lg shadow-primary-900/30 flex items-center justify-center gap-2"
               >
-                Analizar Grabación de Micrófono 🎸
+                {isSubmitting ? "Enviando grabación..." : "Analizar Grabación de Micrófono 🎸"}
               </button>
             </div>
           )}
