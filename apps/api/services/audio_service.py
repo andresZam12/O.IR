@@ -181,6 +181,12 @@ class AudioService:
                     break
                 continue
 
+        # Canal alternativo de alta resiliencia si yt-dlp fue bloqueado por restricciones de datacenter de YouTube
+        try:
+            return self._download_via_direct_stream(clean_url, unique_id)
+        except Exception:
+            pass
+
         err_msg = str(last_error) if last_error else "Error desconocido al procesar el enlace."
         if "not a bot" in err_msg.lower() or "sign in" in err_msg.lower():
             raise RuntimeError(
@@ -188,6 +194,74 @@ class AudioService:
                 "Te sugerimos usar la pestaña 'Subir Archivo' (.mp3 o .wav) o la opción de micrófono para procesarlo al instante."
             )
         raise RuntimeError(f"Error al descargar medio de YouTube: {err_msg}")
+
+    def _download_via_direct_stream(
+        self, clean_url: str, unique_id: str
+    ) -> AudioDownloadResult:
+        """
+        Descarga el stream de audio en MP3 utilizando el canal de procesamiento
+        independiente de restricciones antibot de centros de datos.
+        """
+        import json
+        import urllib.request
+        import time
+
+        match = re.search(r"(?:v=|\/embed\/|\.be\/)([\w\-]{11})", clean_url)
+        video_id = match.group(1) if match else clean_url
+
+        api_url = f"https://loader.to/ajax/download.php?format=mp3&url=https://www.youtube.com/watch?v={video_id}"
+        req = urllib.request.Request(
+            api_url,
+            headers={
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+            },
+        )
+        with urllib.request.urlopen(req, timeout=12) as r:
+            init_data = json.loads(r.read())
+
+        title = init_data.get("title") or f"cancion_{video_id}"
+        progress_url = init_data.get("progress_url")
+        if not progress_url:
+            raise RuntimeError("No se pudo iniciar el canal de extracción.")
+
+        download_link = None
+        for _ in range(25):
+            preq = urllib.request.Request(
+                progress_url,
+                headers={
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+                },
+            )
+            with urllib.request.urlopen(preq, timeout=12) as pr:
+                p_data = json.loads(pr.read())
+                if p_data.get("download_url"):
+                    download_link = p_data["download_url"]
+                    break
+            time.sleep(1.2)
+
+        if not download_link:
+            raise RuntimeError("Tiempo de espera agotado al obtener el flujo MP3.")
+
+        target_file = os.path.join(self.DOWNLOAD_DIR, f"{unique_id}.mp3")
+        with urllib.request.urlopen(download_link, timeout=40) as dl_resp, open(
+            target_file, "wb"
+        ) as f:
+            while True:
+                chunk = dl_resp.read(64 * 1024)
+                if not chunk:
+                    break
+                f.write(chunk)
+
+        if not os.path.exists(target_file) or os.path.getsize(target_file) == 0:
+            raise RuntimeError("El archivo de audio descargado está vacío.")
+
+        return AudioDownloadResult(
+            file_path=target_file,
+            title=title,
+            artist=None,
+            duration=180.0,
+            source_url=clean_url,
+        )
 
     def cleanup_file(self, file_path: str) -> None:
         """Elimina un archivo temporal de audio una vez procesado."""
