@@ -57,6 +57,16 @@ def execute_song_pipeline(
         effective_title = effective_title or download_info.title
         effective_artist = effective_artist or download_info.artist
         is_temp_download = True
+    elif source == "upload" and os.path.exists(effective_audio_path):
+        try:
+            from tinytag import TinyTag
+            tag = TinyTag.get(effective_audio_path)
+            if tag.title and tag.title.strip():
+                effective_title = tag.title.strip()
+            if tag.artist and tag.artist.strip():
+                effective_artist = tag.artist.strip()
+        except Exception:
+            pass
 
     # --- 2. Detección de acordes con librosa ---
     task_context.update_state(

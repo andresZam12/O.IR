@@ -150,26 +150,27 @@ async def upload_audio_file(
         )
 
     file_hash = SongRepository.generate_file_hash(saved_path)
-    effective_title = (
-        track_title.strip() if track_title and track_title.strip() else None
-    )
-    effective_artist = (
-        artist_name.strip() if artist_name and artist_name.strip() else None
-    )
 
-    # Extraer metadatos ID3 / Vorbis incrustados directamente en el archivo
+    # 1. Prioridad Máxima: Metadatos ID3 / Vorbis incrustados directamente en el archivo binario físico
+    embedded_title = None
+    embedded_artist = None
     try:
         from tinytag import TinyTag
         tag = TinyTag.get(saved_path)
-        if not effective_title and tag.title and tag.title.strip():
-            effective_title = tag.title.strip()
-        if not effective_artist and tag.artist and tag.artist.strip():
-            effective_artist = tag.artist.strip()
+        if tag.title and tag.title.strip():
+            embedded_title = tag.title.strip()
+        if tag.artist and tag.artist.strip():
+            embedded_artist = tag.artist.strip()
     except Exception:
         pass
 
-    if not effective_title:
-        effective_title = os.path.splitext(file.filename)[0]
+    # 2. Si no hay ID3 incrustado, extraer del nombre real del archivo físico (ej. "Artista - Canción.mp3")
+    from services.lyrics_service import LyricsService
+    clean_file_track, clean_file_artist, _ = LyricsService.clean_title_and_artist(file.filename or "")
+
+    # El archivo físico manda: jamás permitir que entradas de texto arbitrarias sobrescriban el audio real
+    effective_title = embedded_title or clean_file_track or "Canción"
+    effective_artist = embedded_artist or clean_file_artist
 
     # Despachar a Celery si Redis está activo; de lo contrario, ejecutar localmente
     if is_redis_available():

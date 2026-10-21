@@ -91,3 +91,48 @@ def test_clean_title_and_artist_variations():
     assert clean_t3 == "Bohemian Rhapsody"
     assert eff_a3 == "Queen"
 
+
+def test_lyrics_acoustic_duration_filtering(monkeypatch):
+    """Verifica que candidatos de LRCLIB cuya duración no coincida con el audio real sean descartados."""
+    import asyncio
+    service = LyricsService()
+
+    class MockResponse:
+        status_code = 200
+
+        def json(self):
+            # Canción candidata con duración de 300s frente a un audio real de 180s (diferencia > 4.5s)
+            return [
+                {
+                    "trackName": "Canción Distinta",
+                    "artistName": "Otro Artista",
+                    "duration": 300.0,
+                    "syncedLyrics": "[00:10.00] Letra incorrecta",
+                }
+            ]
+
+    class MockClient:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc_val, exc_tb):
+            pass
+
+        async def get(self, url, params=None, timeout=None):
+            return MockResponse()
+
+    monkeypatch.setattr("httpx.AsyncClient", lambda **kwargs: MockClient())
+
+    # Pasamos una duración real de 180.0 segundos
+    result = asyncio.run(
+        service.fetch_lyrics_lrclib(
+            track_name="Prueba",
+            duration=180.0,
+        )
+    )
+
+    # Debe descartar la letra incorrecta porque su duración de 300s no coincide con los 180s del audio
+    assert result.is_synced is False
+    assert len(result.lines) == 0
+
+
