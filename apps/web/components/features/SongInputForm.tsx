@@ -38,7 +38,7 @@ export default function SongInputForm({
   const detectedVideoId = extractYouTubeVideoId(youtubeUrl);
 
   // Descarga directa a través del backend de O.IR en formato MP3 sin sitios externos ni anuncios
-  const handleDownloadMp3 = () => {
+  const handleDownloadMp3 = async () => {
     if (!youtubeUrl.trim() || isDownloadingMp3) return;
     try {
       setIsDownloadingMp3(true);
@@ -48,13 +48,33 @@ export default function SongInputForm({
         youtubeUrl.trim()
       )}&format=mp3`;
 
-      // Se ejecuta como descarga directa en la misma ventana para evitar pestañas en blanco
+      // Petición asíncrona mediante fetch para evitar redirecciones o pantallas en blanco
+      const response = await fetch(targetUrl);
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        const detailMsg =
+          errorData.detail ||
+          "YouTube ha limitado la descarga desde servidores en la nube. Te sugerimos usar la pestaña 'Grabar Micrófono' para procesar el audio directamente.";
+        throw new Error(detailMsg);
+      }
+
+      const blob = await response.blob();
+      const disposition = response.headers.get("content-disposition");
+      let filename = `cancion_${detectedVideoId || "audio"}.mp3`;
+      if (disposition && disposition.includes("filename=")) {
+        const match = disposition.match(/filename="?([^"]+)"?/);
+        if (match && match[1]) filename = match[1];
+      }
+
+      // Disparador de guardado local del archivo en el navegador
+      const downloadUrl = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
-      link.href = targetUrl;
-      link.setAttribute("download", `cancion_${detectedVideoId || "audio"}.mp3`);
+      link.href = downloadUrl;
+      link.download = filename;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
+      window.URL.revokeObjectURL(downloadUrl);
     } catch (err: unknown) {
       const msg =
         err instanceof Error
@@ -62,7 +82,7 @@ export default function SongInputForm({
           : "Error al descargar el archivo MP3 desde el servidor";
       onError(msg);
     } finally {
-      setTimeout(() => setIsDownloadingMp3(false), 3000);
+      setIsDownloadingMp3(false);
     }
   };
 
