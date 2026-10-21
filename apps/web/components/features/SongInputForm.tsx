@@ -63,9 +63,21 @@ export default function SongInputForm({
       const blob = await response.blob();
       const disposition = response.headers.get("content-disposition");
       let filename = `cancion_${detectedVideoId || "audio"}.mp3`;
-      if (disposition && disposition.includes("filename=")) {
-        const match = disposition.match(/filename="?([^"]+)"?/);
-        if (match && match[1]) filename = match[1];
+      if (disposition) {
+        // Soporte estándar RFC 5987 (filename*=UTF-8''...) para nombres con acentos y caracteres especiales
+        const utf8Match = disposition.match(/filename\*=UTF-8''([^;]+)/i);
+        if (utf8Match && utf8Match[1]) {
+          try {
+            filename = decodeURIComponent(utf8Match[1].trim());
+          } catch {
+            filename = utf8Match[1].trim();
+          }
+        } else {
+          const regularMatch = disposition.match(/filename="?([^";]+)"?/i);
+          if (regularMatch && regularMatch[1]) {
+            filename = regularMatch[1].trim();
+          }
+        }
       }
 
       // Disparador de guardado local del archivo en el navegador

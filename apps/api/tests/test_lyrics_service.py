@@ -69,3 +69,25 @@ def test_align_chords_with_lyrics():
     assert aligned.lines[1].chord == "Am"
     # A t=40.0, el acorde activo es F (comenzó en t=35)
     assert aligned.lines[2].chord == "F"
+
+
+def test_clean_title_and_artist_variations():
+    """Verifica la limpieza de etiquetas de YouTube y el formateo canónico Artista - Canción."""
+    clean_t, eff_a, _ = LyricsService.clean_title_and_artist(
+        "Guns N' Roses - November Rain (Official Music Video)", None
+    )
+    assert clean_t == "November Rain"
+    assert eff_a == "Guns N' Roses"
+
+    clean_t2, eff_a2, _ = LyricsService.clean_title_and_artist(
+        "Al2 El Aldeano - Algo Bonito [Video Oficial]", None
+    )
+    assert clean_t2 == "Algo Bonito"
+    assert eff_a2 == "Al2 El Aldeano"
+
+    clean_t3, eff_a3, _ = LyricsService.clean_title_and_artist(
+        "Queen – Bohemian Rhapsody (Official Video Remastered)", None
+    )
+    assert clean_t3 == "Bohemian Rhapsody"
+    assert eff_a3 == "Queen"
+

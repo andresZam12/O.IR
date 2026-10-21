@@ -404,20 +404,43 @@ async def download_youtube_endpoint(url: str, format: str = "mp3"):
     service = AudioService()
     try:
         import unicodedata
+        from urllib.parse import quote
+        from services.lyrics_service import LyricsService
+
         download_result = service.download_youtube_media(url.strip(), media_format=format)
-        clean_ascii = (
-            unicodedata.normalize("NFKD", download_result.title)
-            .encode("ASCII", "ignore")
-            .decode("ASCII")
+
+        # Extraer título y artista limpios sin etiquetas de video/ruido de YouTube
+        clean_track, eff_artist, _ = LyricsService.clean_title_and_artist(
+            download_result.title, download_result.artist
         )
-        clean_title = (
-            re.sub(r"[^\w\s-]", "", clean_ascii).strip()
-            or "cancion_youtube"
-        )
-        clean_title = re.sub(r"\s+", "_", clean_title)[:50]
+
+        if eff_artist and eff_artist.strip():
+            full_base = f"{eff_artist.strip()} - {clean_track.strip()}"
+        else:
+            full_base = clean_track.strip() or "Canción"
+
+        # Sanear caracteres reservados del sistema de archivos
+        full_base = full_base.replace(":", " - ")
+        full_base = re.sub(r'[\\/*?"<>|]', "", full_base)
+        full_base = re.sub(r"\s+", " ", full_base).strip(" -_")
+
+        # Evitar truncamientos feos en medio de palabras si es muy largo
+        if len(full_base) > 85:
+            full_base = full_base[:85].rsplit(" ", 1)[0].strip(" -_")
+
         is_video = format.lower() == "mp4"
         ext = "mp4" if is_video else "mp3"
-        download_name = f"{clean_title}.{ext}"
+        download_name_utf8 = f"{full_base}.{ext}"
+
+        # Fallback ASCII seguro para clientes que no soportan RFC 5987
+        clean_ascii = (
+            unicodedata.normalize("NFKD", full_base)
+            .encode("ASCII", "ignore")
+            .decode("ASCII")
+            .strip(" -_")
+            or "cancion"
+        )
+        download_name_ascii = f"{clean_ascii}.{ext}"
         media_type = "video/mp4" if is_video else "audio/mpeg"
 
         if not os.path.exists(download_result.file_path):
@@ -426,13 +449,15 @@ async def download_youtube_endpoint(url: str, format: str = "mp3"):
                 detail="El archivo descargado no se pudo encontrar en el servidor.",
             )
 
+        encoded_utf8 = quote(download_name_utf8)
         return FileResponse(
             path=download_result.file_path,
             media_type=media_type,
-            filename=download_name,
+            filename=download_name_utf8,
             headers={
-                "Content-Disposition": f'attachment; filename="{download_name}"',
+                "Content-Disposition": f'attachment; filename="{download_name_ascii}"; filename*=UTF-8\'\'{encoded_utf8}',
                 "Access-Control-Allow-Origin": "*",
+                "Access-Control-Expose-Headers": "Content-Disposition, Content-Length",
             },
         )
     except ValueError as ve:
