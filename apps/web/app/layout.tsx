@@ -37,7 +37,7 @@ interface RootLayoutProps {
 export default function RootLayout({ children }: RootLayoutProps) {
   return (
     <html lang="es" className="dark">
-      <body className="min-h-screen bg-surface-900 text-white antialiased">
+      <body className="min-h-screen bg-[#070812] text-white selection:bg-violet-400/30 antialiased font-sans">
         {children}
       </body>
     </html>
