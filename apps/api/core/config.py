@@ -33,6 +33,12 @@ class Settings(BaseSettings):
     # --- Límites del sistema ---
     max_audio_duration: int = 600  # segundos (10 minutos para permitir canciones completas)
 
+    # --- YouTube Anti-Bot Bypass ---
+    youtube_proxy: str = ""
+    youtube_potoken: str = ""
+    youtube_cookies: str = ""
+    youtube_cookie_path: str = ""
+
     # --- Entorno de ejecución ---
     environment: str = "development"
 

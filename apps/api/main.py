@@ -70,12 +70,21 @@ async def health_check():
         yv = yt_dlp.version.__version__
     except Exception as e:
         yv = str(e)
-    cookie_str = os.getenv("YOUTUBE_COOKIES", "")
+    cookie_str = os.getenv("YOUTUBE_COOKIES", "") or getattr(settings, "youtube_cookies", "")
+    proxy_str = os.getenv("YOUTUBE_PROXY", "") or getattr(settings, "youtube_proxy", "")
+    potoken_str = (
+        os.getenv("YOUTUBE_POTOKEN", "")
+        or os.getenv("YOUTUBE_PO_TOKEN", "")
+        or getattr(settings, "youtube_potoken", "")
+    )
     return {
         "status": "ok",
-        "build": "110-cookie-opt",
+        "build": "111-proxy-potoken-support",
         "python": sys.version,
         "yt_dlp": yv,
+        "has_youtube_proxy": bool(proxy_str),
+        "has_youtube_potoken": bool(potoken_str),
         "has_youtube_cookies": bool(cookie_str or os.getenv("YOUTUBE_COOKIE_PATH")),
         "cookie_length": len(cookie_str),
     }
+

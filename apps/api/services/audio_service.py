@@ -84,14 +84,26 @@ class AudioService:
         if match:
             clean_url = f"https://www.youtube.com/watch?v={match.group(1)}"
 
+        # Soporte para proxy residencial (elude completamente bloqueos antibot de datacenter en Render / AWS)
+        proxy = os.getenv("YOUTUBE_PROXY") or getattr(settings, "youtube_proxy", "")
+
+        # Soporte para PoToken (Proof of Origin Token de YouTube)
+        potoken = (
+            os.getenv("YOUTUBE_POTOKEN")
+            or os.getenv("YOUTUBE_PO_TOKEN")
+            or getattr(settings, "youtube_potoken", "")
+        )
+
         # Soporte para cookies opcionales si se configuran en el servidor en la nube
-        cookie_path = os.getenv("YOUTUBE_COOKIE_PATH")
-        cookie_content = os.getenv("YOUTUBE_COOKIES")
+        cookie_path = os.getenv("YOUTUBE_COOKIE_PATH") or getattr(settings, "youtube_cookie_path", "")
+        cookie_content = os.getenv("YOUTUBE_COOKIES") or getattr(settings, "youtube_cookies", "")
         if cookie_content and not cookie_path:
             cookie_path = os.path.join(self.DOWNLOAD_DIR, "yt_cookies.txt")
             try:
-                # Normalizar saltos de línea y tabulaciones por si vienen escapados desde la consola de Render
-                normalized = cookie_content.replace("\\n", "\n").replace("\\t", "\t")
+                # Normalizar saltos de línea y tabulaciones, garantizando encabezado Netscape estándar
+                normalized = cookie_content.replace("\\n", "\n").replace("\\t", "\t").strip()
+                if not normalized.startswith("# Netscape HTTP Cookie File"):
+                    normalized = f"# Netscape HTTP Cookie File\n{normalized}"
                 with open(cookie_path, "w", encoding="utf-8") as cf:
                     cf.write(normalized)
             except Exception:
@@ -106,21 +118,42 @@ class AudioService:
             "quiet": True,
             "no_warnings": True,
             "noplaylist": True,
-            "socket_timeout": 12,
-            "retries": 1,
+            "socket_timeout": 20,
+            "retries": 2,
             "max_filesize": 100 * 1024 * 1024 if is_video else 60 * 1024 * 1024,
             "js_runtimes": {"node": {}},
         }
 
+        if proxy and proxy.strip():
+            base_opts["proxy"] = proxy.strip()
+
         if cookie_path and os.path.exists(cookie_path):
             base_opts["cookiefile"] = cookie_path
-            # Con cookies de navegador de escritorio, el cliente web y automático son óptimos
+
+        # Selección de estrategias de cliente y evasión
+        if potoken and potoken.strip():
+            token_clean = potoken.strip()
+            po_arg = token_clean if "+" in token_clean else f"web+{token_clean}"
+            strategies = [
+                {"extractor_args": {"youtube": {"po_token": [po_arg], "player_client": ["web"]}}},
+                {"extractor_args": {"youtube": {"player_client": ["web"]}}},
+                {},
+            ]
+        elif proxy and proxy.strip():
+            # Con proxy residencial, las peticiones emulan usuarios reales de ISP hogareño
+            strategies = [
+                {},
+                {"extractor_args": {"youtube": {"player_client": ["android", "ios", "web"]}}},
+                {"extractor_args": {"youtube": {"player_client": ["web"]}}},
+            ]
+        elif cookie_path and os.path.exists(cookie_path):
+            # Con cookies de sesión
             strategies = [
                 {},
                 {"extractor_args": {"youtube": {"player_client": ["web"]}}},
             ]
         else:
-            # Sin cookies: probar estrategias de extracción ligera
+            # Estrategias de fallback ligero para centros de datos
             strategies = [
                 {},
                 {"extractor_args": {"youtube": {"player_client": ["tv", "web"]}}},
