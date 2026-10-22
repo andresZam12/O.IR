@@ -6,161 +6,116 @@ import {
   View,
   StyleSheet,
 } from "@react-pdf/renderer";
-import { ProcessedSongResult } from "@/types/song";
+import { ProcessedSongResult, ChordItem } from "@/types/song";
 
-// Estilos del documento PDF
+// Estilos de alta calidad para cancionero profesional
 const styles = StyleSheet.create({
   page: {
     paddingTop: 36,
-    paddingBottom: 48,
-    paddingHorizontal: 42,
+    paddingBottom: 40,
+    paddingHorizontal: 40,
     backgroundColor: "#ffffff",
     fontFamily: "Helvetica",
     fontSize: 10,
-    color: "#1e293b",
+    color: "#0f172a",
+    position: "relative",
   },
+  // Marca de agua de O.IR que abarca la mayoría de la página
+  watermarkWrapper: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    display: "flex",
+    flexDirection: "column",
+    justifyContent: "space-around",
+    alignItems: "center",
+    zIndex: -1,
+  },
+  watermarkText: {
+    fontSize: 140,
+    fontFamily: "Helvetica-Bold",
+    color: "#000000",
+    opacity: 0.045,
+    transform: "rotate(-35deg)",
+    letterSpacing: 10,
+    textTransform: "lowercase",
+  },
+  // Encabezado principal: únicamente Título, Artista y Tonalidad
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "center",
+    alignItems: "flex-end",
     borderBottomWidth: 1.5,
-    borderBottomColor: "#6366f1",
-    paddingBottom: 10,
-    marginBottom: 16,
+    borderBottomColor: "#0f172a",
+    paddingBottom: 8,
+    marginBottom: 20,
   },
-  logo: {
-    fontSize: 18,
-    fontFamily: "Helvetica-Bold",
-    color: "#6366f1",
-  },
-  tagline: {
-    fontSize: 8,
-    color: "#64748b",
-  },
-  titleSection: {
-    marginBottom: 14,
-  },
-  songTitle: {
-    fontSize: 20,
-    fontFamily: "Helvetica-Bold",
-    color: "#0f172a",
-    marginBottom: 3,
-  },
-  artistName: {
-    fontSize: 12,
-    color: "#475569",
-  },
-  metaGrid: {
-    flexDirection: "row",
-    backgroundColor: "#f8fafc",
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: "#e2e8f0",
-    padding: 8,
-    marginBottom: 14,
-  },
-  metaItem: {
+  titleGroup: {
     flex: 1,
   },
-  metaLabel: {
-    fontSize: 7,
-    fontFamily: "Helvetica-Bold",
-    color: "#64748b",
-    textTransform: "uppercase",
-    marginBottom: 2,
-  },
-  metaValue: {
-    fontSize: 10,
-    fontFamily: "Helvetica-Bold",
-    color: "#1e293b",
-  },
-  chordsBox: {
-    backgroundColor: "#eff6ff",
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: "#bfdbfe",
-    padding: 8,
-    marginBottom: 14,
-  },
-  chordsTitle: {
-    fontSize: 8,
-    fontFamily: "Helvetica-Bold",
-    color: "#1d4ed8",
-    marginBottom: 4,
-    textTransform: "uppercase",
-  },
-  chordsList: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 6,
-  },
-  chordBadge: {
-    backgroundColor: "#dbeafe",
-    borderRadius: 4,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    fontSize: 9,
-    fontFamily: "Helvetica-Bold",
-    color: "#1e40af",
-  },
-  difficultySection: {
-    backgroundColor: "#fdf4ff",
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: "#f5d0fe",
-    padding: 8,
-    marginBottom: 16,
-  },
-  difficultyTitle: {
-    fontSize: 8,
-    fontFamily: "Helvetica-Bold",
-    color: "#a21caf",
-    marginBottom: 3,
-    textTransform: "uppercase",
-  },
-  difficultyText: {
-    fontSize: 8,
-    color: "#4a044e",
-    lineHeight: 1.3,
-  },
-  songSheetTitle: {
-    fontSize: 11,
+  songTitle: {
+    fontSize: 22,
     fontFamily: "Helvetica-Bold",
     color: "#0f172a",
-    borderBottomWidth: 1,
-    borderBottomColor: "#cbd5e1",
-    paddingBottom: 4,
-    marginBottom: 10,
     textTransform: "uppercase",
+    letterSpacing: 0.5,
   },
-  lyricsContainer: {
-    marginTop: 4,
+  artistName: {
+    fontSize: 11,
+    fontFamily: "Helvetica",
+    color: "#475569",
+    marginTop: 2,
   },
-  lyricRow: {
-    marginBottom: 8,
+  keyBadge: {
+    backgroundColor: "#f8fafc",
+    borderWidth: 1,
+    borderColor: "#cbd5e1",
+    borderRadius: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    alignItems: "center",
   },
-  chordAbove: {
+  keyText: {
     fontSize: 9,
     fontFamily: "Helvetica-Bold",
-    color: "#4f46e5",
+    color: "#0f172a",
+    textTransform: "uppercase",
+  },
+  // Contenedor de la letra y los acordes
+  songSheet: {
+    marginTop: 4,
+  },
+  lineBlock: {
+    marginBottom: 8,
+  },
+  chordLine: {
+    fontFamily: "Courier-Bold",
+    fontSize: 9.5,
+    color: "#b45309", // Tono ámbar/dorado clásico de cancionero profesional
     marginBottom: 1,
+    letterSpacing: 0.2,
   },
-  lyricText: {
-    fontSize: 10,
-    color: "#1e293b",
-    lineHeight: 1.3,
+  lyricLine: {
+    fontFamily: "Courier",
+    fontSize: 9.5,
+    color: "#0f172a",
+    letterSpacing: 0.2,
   },
+  // Pie de página sutil
   footer: {
     position: "absolute",
-    bottom: 20,
-    left: 42,
-    right: 42,
+    bottom: 18,
+    left: 40,
+    right: 40,
     flexDirection: "row",
     justifyContent: "space-between",
-    borderTopWidth: 1,
-    borderTopColor: "#e2e8f0",
+    borderTopWidth: 0.5,
+    borderTopColor: "#cbd5e1",
     paddingTop: 6,
     fontSize: 8,
+    fontFamily: "Helvetica",
     color: "#94a3b8",
   },
 });
@@ -169,188 +124,212 @@ interface SongPdfDocumentProps {
   data: ProcessedSongResult;
 }
 
+interface FormattedPdfLine {
+  chordLine: string;
+  lyricLine: string;
+}
+
 export default function SongPdfDocument({ data }: SongPdfDocumentProps) {
-  const title = data.lyrics?.title || "Canción";
-  const artist = data.lyrics?.artist || "Artista Desconocido";
-  const key = data.estimated_key || "No especificada";
-  const level = data.difficulty?.metrics.level || "Principiante";
-  const score = data.difficulty?.metrics.score || 3.0;
+  const title = (data.lyrics?.title || "Canción").trim();
+  const artist = (data.lyrics?.artist || "Desconocido").trim();
+  const estimatedKey = data.estimated_key || "Estándar";
+  const chords = data.chords || [];
+  const lines = data.lyrics?.lines || [];
+
+  // Formatear líneas de cancionero (acordes alineados arriba de la letra)
+  const formattedLines: FormattedPdfLine[] = React.useMemo(() => {
+    const formatted: FormattedPdfLine[] = [];
+
+    // CASO A: Tenemos letra sincronizada
+    if (lines.length > 0) {
+      const firstLineTime = lines[0].time;
+
+      // 1. Detectar acordes de intro antes del primer verso cantado
+      if (firstLineTime > 4.0) {
+        const introChords = chords.filter((c) => c.time < firstLineTime - 0.5);
+        if (introChords.length > 0) {
+          const distinctIntro: string[] = [];
+          introChords.forEach((c) => {
+            if (
+              distinctIntro.length === 0 ||
+              distinctIntro[distinctIntro.length - 1] !== c.chord
+            ) {
+              distinctIntro.push(c.chord);
+            }
+          });
+
+          const displayIntro = distinctIntro.slice(0, 4);
+          const chordText = displayIntro.map((c) => c.padEnd(16, " ")).join("");
+          formatted.push({
+            chordLine: `   ${chordText.trimEnd()}`,
+            lyricLine: `[INTRO INSTRUMENTAL]   ${displayIntro.join("  -  ")}`,
+          });
+        }
+      }
+
+      // 2. Mapear cada verso de la letra con sus acordes respectivos
+      lines.forEach((line, idx) => {
+        const lineStart = line.time;
+        const nextLineStart = lines[idx + 1]?.time || lineStart + 6;
+        const lineDuration = Math.max(nextLineStart - lineStart, 2);
+
+        const lineChords = chords.filter(
+          (c) => c.time >= lineStart - 0.5 && c.time < nextLineStart
+        );
+
+        let activeChords = lineChords;
+        if (activeChords.length === 0) {
+          const lastChord = chords
+            .slice()
+            .reverse()
+            .find((c) => c.time <= lineStart);
+          if (lastChord) activeChords = [lastChord];
+        }
+
+        let text = line.text.trim();
+        if (!text) {
+          if (activeChords.length > 0) {
+            text = "[INTERLUDIO INSTRUMENTAL]";
+          } else {
+            return;
+          }
+        }
+
+        // Desduplicar acordes consecutivos para simplificar la partitura
+        const distinctChords: ChordItem[] = [];
+        activeChords.forEach((c) => {
+          if (
+            distinctChords.length === 0 ||
+            distinctChords[distinctChords.length - 1].chord !== c.chord
+          ) {
+            distinctChords.push(c);
+          }
+        });
+
+        let simplifiedChords = distinctChords;
+        if (simplifiedChords.length > 2) {
+          simplifiedChords = [
+            simplifiedChords[0],
+            simplifiedChords[simplifiedChords.length - 1],
+          ];
+        }
+
+        const chordLineChars = new Array(Math.max(text.length, 36)).fill(" ");
+
+        if (simplifiedChords.length === 1) {
+          const chordName = simplifiedChords[0].chord;
+          const insertPos = Math.min(2, Math.max(0, text.length - chordName.length));
+          for (let i = 0; i < chordName.length; i++) {
+            chordLineChars[insertPos + i] = chordName[i];
+          }
+        } else if (simplifiedChords.length >= 2) {
+          const chord1 = simplifiedChords[0].chord;
+          const chord2 = simplifiedChords[1].chord;
+
+          for (let i = 0; i < chord1.length; i++) {
+            chordLineChars[i] = chord1[i];
+          }
+
+          const ratio = Math.max(
+            0.4,
+            Math.min(0.75, (simplifiedChords[1].time - lineStart) / lineDuration)
+          );
+          let pos2 = Math.floor(ratio * text.length);
+          if (pos2 < chord1.length + 6) pos2 = chord1.length + 6;
+
+          for (let i = 0; i < chord2.length; i++) {
+            if (pos2 + i < chordLineChars.length) {
+              chordLineChars[pos2 + i] = chord2[i];
+            }
+          }
+        }
+
+        formatted.push({
+          chordLine: chordLineChars.join("").trimEnd(),
+          lyricLine: text,
+        });
+      });
+
+      return formatted;
+    }
+
+    // CASO B: Sin letra -> estructurar en compases armónicos
+    const distinctGlobalChords: ChordItem[] = [];
+    chords.forEach((c) => {
+      if (
+        distinctGlobalChords.length === 0 ||
+        distinctGlobalChords[distinctGlobalChords.length - 1].chord !== c.chord
+      ) {
+        distinctGlobalChords.push(c);
+      }
+    });
+
+    const step = 2;
+    const sectionNames = [
+      "INTRO",
+      "ESTROFA 1",
+      "ESTROFA 2",
+      "CORO",
+      "PUENTE",
+      "ESTROFA 3",
+      "CORO FINAL",
+      "OUTRO",
+    ];
+    let secIdx = 0;
+
+    for (let i = 0; i < distinctGlobalChords.length; i += step) {
+      const chunk = distinctGlobalChords.slice(i, i + step);
+      const currentSec = sectionNames[secIdx % sectionNames.length];
+      if (i > 0 && i % (step * 2) === 0) secIdx++;
+
+      const chordText = chunk.map((c) => c.chord.padEnd(20, " ")).join("");
+      const phraseText =
+        `[${currentSec}]   ` + chunk.map((c) => c.chord).join("  -  ");
+
+      formatted.push({
+        chordLine: `    ${chordText}`,
+        lyricLine: phraseText,
+      });
+    }
+
+    return formatted;
+  }, [lines, chords]);
 
   return (
     <Document>
       <Page size="A4" style={styles.page}>
-        {/* Encabezado */}
+        {/* Marca de agua grande fija de O.IR que abarca la mayoría de cada página */}
+        <View style={styles.watermarkWrapper} fixed>
+          <Text style={styles.watermarkText}>o.ir</Text>
+          <Text style={styles.watermarkText}>o.ir</Text>
+        </View>
+
+        {/* Encabezado: Título, Artista y Tonalidad únicamente */}
         <View style={styles.header}>
-          <Text style={styles.logo}>O.IR</Text>
-          <Text style={styles.tagline}>
-            Cancionero Imprimible con Acordes y Letra
-          </Text>
-        </View>
-
-        {/* Título de la obra */}
-        <View style={styles.titleSection}>
-          <Text style={styles.songTitle}>{title}</Text>
-          <Text style={styles.artistName}>{artist}</Text>
-        </View>
-
-        {/* Metadatos (Tonalidad, Dificultad, Duración) */}
-        <View style={styles.metaGrid}>
-          <View style={styles.metaItem}>
-            <Text style={styles.metaLabel}>Tonalidad</Text>
-            <Text style={styles.metaValue}>{key}</Text>
+          <View style={styles.titleGroup}>
+            <Text style={styles.songTitle}>{title}</Text>
+            {artist && <Text style={styles.artistName}>{artist}</Text>}
           </View>
-          <View style={styles.metaItem}>
-            <Text style={styles.metaLabel}>Dificultad</Text>
-            <Text style={styles.metaValue}>
-              {level} ({score}/10)
-            </Text>
-          </View>
-          <View style={styles.metaItem}>
-            <Text style={styles.metaLabel}>Duración</Text>
-            <Text style={styles.metaValue}>
-              {Math.floor(data.duration / 60)}:
-              {Math.floor(data.duration % 60)
-                .toString()
-                .padStart(2, "0")}{" "}
-              min
-            </Text>
-          </View>
-          <View style={styles.metaItem}>
-            <Text style={styles.metaLabel}>Acordes Usados</Text>
-            <Text style={styles.metaValue}>{data.unique_chords.length}</Text>
+          <View style={styles.keyBadge}>
+            <Text style={styles.keyText}>Tonalidad: {estimatedKey}</Text>
           </View>
         </View>
 
-        {/* Acordes Únicos */}
-        {data.unique_chords.length > 0 && (
-          <View style={styles.chordsBox}>
-            <Text style={styles.chordsTitle}>Acordes necesarios:</Text>
-            <View style={styles.chordsList}>
-              {data.unique_chords.map((chord, idx) => (
-                <Text key={idx} style={styles.chordBadge}>
-                  {chord}
-                </Text>
-              ))}
+        {/* Letra de la canción con sus acordes exactos alineados arriba */}
+        <View style={styles.songSheet}>
+          {formattedLines.map((line, idx) => (
+            <View key={idx} style={styles.lineBlock} wrap={false}>
+              {line.chordLine ? (
+                <Text style={styles.chordLine}>{line.chordLine}</Text>
+              ) : null}
+              <Text style={styles.lyricLine}>{line.lyricLine}</Text>
             </View>
-          </View>
-        )}
-
-        {/* Resumen pedagógico */}
-        {data.difficulty && (
-          <View style={styles.difficultySection}>
-            <Text style={styles.difficultyTitle}>Guía de Práctica:</Text>
-            <Text style={styles.difficultyText}>
-              {data.difficulty.explanation}
-            </Text>
-          </View>
-        )}
-
-        {/* Cancionero: Letras con Acordes Arriba (Formato Cancionero Profesional) */}
-        <Text style={styles.songSheetTitle}>Cancionero: Acordes sobre Letra</Text>
-
-        <View style={styles.lyricsContainer}>
-          {data.lyrics?.lines && data.lyrics.lines.length > 0 ? (
-            data.lyrics.lines.map((line, idx) => {
-              const text = line.text.trim();
-              if (!text) return null;
-
-              // Distribuir acordes en Courier monoespaciado
-              const lineStart = line.time;
-              const nextStart = data.lyrics?.lines[idx + 1]?.time || lineStart + 6;
-              const duration = Math.max(nextStart - lineStart, 2);
-
-              const lineChords = data.chords.filter(
-                (c) => c.time >= lineStart - 0.5 && c.time < nextStart
-              );
-
-              let chordLineChars = new Array(Math.max(text.length, 30)).fill(" ");
-              if (lineChords.length === 0) {
-                if (line.chord) {
-                  for (let i = 0; i < line.chord.length; i++) {
-                    chordLineChars[Math.min(6, text.length) + i] = line.chord[i];
-                  }
-                }
-              } else {
-                lineChords.forEach((c) => {
-                  const ratio = Math.max(0, Math.min(0.85, (c.time - lineStart) / duration));
-                  const insertPos = Math.floor(ratio * text.length);
-                  for (let i = 0; i < c.chord.length; i++) {
-                    if (insertPos + i < chordLineChars.length) {
-                      chordLineChars[insertPos + i] = c.chord[i];
-                    }
-                  }
-                });
-              }
-
-              const chordLineStr = chordLineChars.join("").trimEnd();
-
-              return (
-                <View key={idx} style={{ marginBottom: 6 }}>
-                  {chordLineStr ? (
-                    <Text
-                      style={{
-                        fontFamily: "Courier-Bold",
-                        fontSize: 9,
-                        color: "#d97706",
-                        marginBottom: 1,
-                      }}
-                    >
-                      {chordLineStr}
-                    </Text>
-                  ) : null}
-                  <Text
-                    style={{
-                      fontFamily: "Courier",
-                      fontSize: 9,
-                      color: "#1e293b",
-                    }}
-                  >
-                    {text}
-                  </Text>
-                </View>
-              );
-            })
-          ) : (
-            // Si no hay letra, estructurar en compases de 4 acordes
-            <View style={{ marginTop: 4 }}>
-              <Text
-                style={{
-                  fontSize: 8,
-                  fontFamily: "Helvetica-Bold",
-                  color: "#64748b",
-                  marginBottom: 6,
-                  textTransform: "uppercase",
-                }}
-              >
-                Progresión armónica por compases (4 tiempos):
-              </Text>
-              {Array.from({ length: Math.ceil(data.chords.length / 4) }).map((_, bIdx) => {
-                const barChords = data.chords.slice(bIdx * 4, bIdx * 4 + 4);
-                const barText = barChords
-                  .map((c) => c.chord.padEnd(8, " "))
-                  .join(" | ");
-
-                return (
-                  <Text
-                    key={bIdx}
-                    style={{
-                      fontFamily: "Courier-Bold",
-                      fontSize: 9,
-                      color: "#b45309",
-                      marginBottom: 4,
-                    }}
-                  >
-                    {`|  ${barText} |`}
-                  </Text>
-                );
-              })}
-            </View>
-          )}
+          ))}
         </View>
 
-        {/* Pie de página */}
+        {/* Pie de página discreto */}
         <View style={styles.footer} fixed>
-          <Text>Generado automáticamente por O.IR Platform</Text>
+          <Text>O.IR &bull; Cancionero Musical</Text>
           <Text
             render={({ pageNumber, totalPages }) =>
               `Página ${pageNumber} de ${totalPages}`

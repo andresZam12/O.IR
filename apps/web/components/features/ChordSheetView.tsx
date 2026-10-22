@@ -243,14 +243,27 @@ export default function ChordSheetView({
   };
 
   return (
-    <div className="card w-full max-w-4xl mx-auto shadow-2xl border-slate-800 bg-[#0b0f19] p-6 sm:p-10 print:bg-white print:text-black print:border-none print:shadow-none print:p-0">
-      {/* Encabezado limpio de la partitura */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between pb-6 border-b border-slate-800/80 gap-4 print:border-b-2 print:border-black">
+    <div
+      id="printable-cancionero"
+      className="card relative w-full max-w-4xl mx-auto shadow-2xl border-slate-800 bg-[#0b0f19] p-6 sm:p-10 print:bg-white print:text-black print:border-none print:shadow-none print:p-0 print:m-0"
+    >
+      {/* Marcas de agua muy grandes de O.IR que abarcan la mayoría de la página en impresión/PDF */}
+      <div className="hidden print:flex fixed inset-0 pointer-events-none items-center justify-around flex-col -z-10 select-none overflow-hidden opacity-[0.05]">
+        <span className="text-[140px] font-black text-black -rotate-35 tracking-[0.25em] uppercase select-none">
+          o.ir
+        </span>
+        <span className="text-[140px] font-black text-black -rotate-35 tracking-[0.25em] uppercase select-none">
+          o.ir
+        </span>
+      </div>
+
+      {/* Encabezado limpio de la partitura: Título, Artista y Tonalidad */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between pb-6 border-b border-slate-800/80 gap-4 print:border-b-2 print:border-black print:pb-4 print:mb-4">
         <div>
-          <span className="text-xs uppercase tracking-widest font-bold text-amber-500 print:text-amber-800">
-            Cancionero Armónico &bull; Tonalidad: {estimatedKey || "Estándar"}
+          <span className="text-xs uppercase tracking-widest font-bold text-amber-500 print:text-slate-800">
+            Tonalidad: {estimatedKey || "Estándar"}
           </span>
-          <h2 className="text-3xl font-black text-white tracking-tight mt-1 uppercase print:text-black">
+          <h2 className="text-3xl font-black text-white tracking-tight mt-1 uppercase print:text-2xl print:text-black print:font-black">
             {title}
           </h2>
           {artist && (

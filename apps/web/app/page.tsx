@@ -111,9 +111,9 @@ export default function HomePage() {
   };
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-[#070812] text-white selection:bg-violet-400/30">
+    <main className="relative min-h-screen overflow-hidden bg-[#070812] text-white selection:bg-violet-400/30 print:bg-white print:text-black print:overflow-visible print:min-h-0">
       {/* Luces de ambiente y elementos visuales de fondo de v0 */}
-      <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
+      <div className="pointer-events-none absolute inset-0 overflow-hidden print:hidden" aria-hidden="true">
         <div className="absolute -left-40 top-0 h-[28rem] w-[28rem] rounded-full bg-violet-700/10 blur-[120px]" />
         <div className="absolute -right-32 bottom-0 h-[34rem] w-[34rem] rounded-full bg-blue-600/10 blur-[130px]" />
         <div className="absolute inset-0 opacity-[0.04] [background-image:linear-gradient(rgba(255,255,255,.35)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.35)_1px,transparent_1px)] [background-size:72px_72px]" />
@@ -147,7 +147,7 @@ export default function HomePage() {
       </div>
 
       {/* Barra de navegación superior estilo v0 */}
-      <header className="relative z-10 mx-auto flex max-w-7xl items-center justify-between px-6 py-6 lg:px-10">
+      <header className="relative z-10 mx-auto flex max-w-7xl items-center justify-between px-6 py-6 lg:px-10 print:hidden">
         <div className="flex items-center gap-3">
           <div className="flex size-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.06] shadow-lg shadow-violet-950/30">
             <Music2 className="size-4 text-violet-300" />
@@ -181,9 +181,9 @@ export default function HomePage() {
       </header>
 
       {/* Contenido principal */}
-      <section className="relative z-10 mx-auto max-w-7xl px-6 pb-16 pt-4 lg:px-10 lg:pt-8">
+      <section className="relative z-10 mx-auto max-w-7xl px-6 pb-16 pt-4 lg:px-10 lg:pt-8 print:p-0 print:m-0 print:max-w-none">
         {/* Hero Section */}
-        <div className="mb-10 max-w-2xl">
+        <div className="mb-10 max-w-2xl print:hidden">
           <div className="mb-4 flex items-center gap-4">
             <span className="text-3xl text-cyan-300 drop-shadow-[0_0_16px_rgba(103,232,249,.9)]">
               ♪
@@ -219,7 +219,7 @@ export default function HomePage() {
 
         {/* Mensaje de error (si existe) */}
         {errorMessage && (
-          <div className="mb-8 w-full max-w-4xl rounded-2xl border border-rose-500/30 bg-rose-950/40 p-4 text-xs text-rose-200 backdrop-blur-md flex items-center justify-between">
+          <div className="mb-8 w-full max-w-4xl rounded-2xl border border-rose-500/30 bg-rose-950/40 p-4 text-xs text-rose-200 backdrop-blur-md flex items-center justify-between print:hidden">
             <div className="flex items-center gap-3">
               <span className="text-lg">⚠️</span>
               <span>{errorMessage}</span>
@@ -235,7 +235,7 @@ export default function HomePage() {
 
         {/* Layout en 2 Columnas estilo v0 (si no hay datos procesados) */}
         {!processedData && !jobId && (
-          <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_300px]">
+          <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_300px] print:hidden">
             {/* Columna Izquierda: Formulario de Entrada */}
             <SongInputForm
               onJobStarted={handleJobStarted}
@@ -297,14 +297,14 @@ export default function HomePage() {
 
         {/* Barra de progreso de análisis */}
         {jobId && jobStatus && (
-          <div className="w-full max-w-4xl mx-auto my-6">
+          <div className="w-full max-w-4xl mx-auto my-6 print:hidden">
             <ProcessingProgress status={jobStatus} />
           </div>
         )}
 
         {/* Clave de Sol · Visualizador de Progresión de Acordes (Tarjeta inferior estilo v0) */}
         {!processedData && (
-          <div className="mt-5 flex flex-col gap-5 rounded-3xl border border-violet-300/20 bg-black/25 p-5 shadow-[0_0_55px_rgba(124,58,237,.12)] backdrop-blur-md sm:p-7">
+          <div className="mt-5 flex flex-col gap-5 rounded-3xl border border-violet-300/20 bg-black/25 p-5 shadow-[0_0_55px_rgba(124,58,237,.12)] backdrop-blur-md sm:p-7 print:hidden">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
                 <span className="text-5xl leading-none text-violet-300 drop-shadow-[0_0_18px_rgba(167,139,250,.8)]">
@@ -341,9 +341,9 @@ export default function HomePage() {
 
         {/* Sección de Resultados cuando la canción culmina su análisis */}
         {processedData && (
-          <div className="mt-8 w-full max-w-5xl mx-auto space-y-6">
+          <div className="mt-8 w-full max-w-5xl mx-auto space-y-6 print:m-0 print:p-0 print:max-w-none print:space-y-0">
             {/* Header del resultado con botón de reiniciar y PDF */}
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 rounded-3xl border border-white/10 bg-white/[0.045] p-5 shadow-2xl backdrop-blur-md">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 rounded-3xl border border-white/10 bg-white/[0.045] p-5 shadow-2xl backdrop-blur-md print:hidden">
               <div className="flex items-center gap-4">
                 <div className="flex size-12 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-500/20 to-indigo-500/10 border border-violet-400/30 text-violet-300 shadow-[0_0_20px_rgba(124,58,237,.2)]">
                   <Guitar className="size-6" />
@@ -378,19 +378,23 @@ export default function HomePage() {
 
             {/* Tarjeta de Dificultad */}
             {processedData.difficulty && (
-              <DifficultyCard evaluation={processedData.difficulty} />
+              <div className="print:hidden">
+                <DifficultyCard evaluation={processedData.difficulty} />
+              </div>
             )}
 
             {/* Control de Transposición */}
             {processedData.unique_chords && processedData.unique_chords.length > 0 && (
-              <TransposerControl
-                originalChords={processedData.unique_chords}
-                onTransposeChange={(mapping) => setTransposeMap(mapping)}
-              />
+              <div className="print:hidden">
+                <TransposerControl
+                  originalChords={processedData.unique_chords}
+                  onTransposeChange={(mapping) => setTransposeMap(mapping)}
+                />
+              </div>
             )}
 
             {/* Selector de Vista: Cancionero vs Karaoke */}
-            <div className="flex overflow-x-auto rounded-2xl border border-white/[0.07] bg-black/20 p-1 max-w-md">
+            <div className="flex overflow-x-auto rounded-2xl border border-white/[0.07] bg-black/20 p-1 max-w-md print:hidden">
               <button
                 type="button"
                 onClick={() => setResultTab("chordsheet")}
@@ -434,18 +438,20 @@ export default function HomePage() {
                 }
               />
             ) : (
-              <KaraokeView
-                chords={displayChords}
-                lyrics={processedData.lyrics}
-                duration={processedData.duration}
-                estimatedKey={processedData.estimated_key}
-                audioUrl={
-                  audioUrl ||
-                  (processedData.audio_url
-                    ? `${process.env.NEXT_PUBLIC_API_URL || "https://oir-api.onrender.com"}${processedData.audio_url}`
-                    : undefined)
-                }
-              />
+              <div className="print:hidden">
+                <KaraokeView
+                  chords={displayChords}
+                  lyrics={processedData.lyrics}
+                  duration={processedData.duration}
+                  estimatedKey={processedData.estimated_key}
+                  audioUrl={
+                    audioUrl ||
+                    (processedData.audio_url
+                      ? `${process.env.NEXT_PUBLIC_API_URL || "https://oir-api.onrender.com"}${processedData.audio_url}`
+                      : undefined)
+                  }
+                />
+              </div>
             )}
           </div>
         )}
