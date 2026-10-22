@@ -39,10 +39,103 @@ from workers.song_worker import execute_song_pipeline, process_song
 
 router = APIRouter()
 
+import json
+import sqlite3
 import threading
 
-# Almacén de trabajos local para fallback cuando Redis no está activo
+# Almacén de trabajos local con respaldo persistente en disco (SQLite)
+# para evitar pérdidas por reciclado de procesos o reinicios en el tier gratuito de Render
 local_jobs: dict[str, dict] = {}
+JOBS_DB_PATH = os.path.join(tempfile.gettempdir(), "oir_jobs_v2.db")
+
+
+def _init_jobs_db() -> None:
+    try:
+        with sqlite3.connect(JOBS_DB_PATH, timeout=5.0) as conn:
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS local_jobs_cache (
+                    job_id TEXT PRIMARY KEY,
+                    status TEXT,
+                    progress INTEGER,
+                    step TEXT,
+                    result TEXT,
+                    error TEXT,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+    except Exception:
+        pass
+
+
+_init_jobs_db()
+
+
+def _save_local_job(
+    job_id: str,
+    status: str,
+    progress: int,
+    step: str,
+    result: Optional[dict] = None,
+    error: Optional[str] = None,
+) -> None:
+    local_jobs[job_id] = {
+        "status": status,
+        "progress": progress,
+        "step": step,
+        "result": result,
+        "error": error,
+    }
+    try:
+        with sqlite3.connect(JOBS_DB_PATH, timeout=5.0) as conn:
+            conn.execute("""
+                INSERT INTO local_jobs_cache (job_id, status, progress, step, result, error)
+                VALUES (?, ?, ?, ?, ?, ?)
+                ON CONFLICT(job_id) DO UPDATE SET
+                    status=excluded.status,
+                    progress=excluded.progress,
+                    step=excluded.step,
+                    result=excluded.result,
+                    error=excluded.error,
+                    updated_at=CURRENT_TIMESTAMP
+            """, (
+                job_id,
+                status,
+                progress,
+                step,
+                json.dumps(result) if result else None,
+                error,
+            ))
+    except Exception:
+        pass
+
+
+def _get_local_job(job_id: str) -> Optional[dict]:
+    if job_id in local_jobs:
+        return local_jobs[job_id]
+    try:
+        with sqlite3.connect(JOBS_DB_PATH, timeout=5.0) as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT status, progress, step, result, error FROM local_jobs_cache WHERE job_id = ?",
+                (job_id,),
+            )
+            row = cursor.fetchone()
+            if row:
+                res = json.loads(row[3]) if row[3] else None
+                job_data = {
+                    "status": row[0],
+                    "progress": row[1],
+                    "step": row[2],
+                    "result": res,
+                    "error": row[4],
+                }
+                local_jobs[job_id] = job_data
+                return job_data
+    except Exception:
+        pass
+    return None
+
+
 # Bloqueo para serializar el procesamiento de audio en entornos con memoria limitada (ej. Render 512MB)
 pipeline_lock = threading.Semaphore(1)
 
@@ -70,14 +163,16 @@ def run_direct_process(
     """Ejecuta el procesamiento en hilo local si Celery/Redis no están disponibles."""
     class TaskContext:
         def update_state(self, state: str, meta: dict) -> None:
-            if job_id in local_jobs:
-                local_jobs[job_id]["status"] = state
-                local_jobs[job_id]["progress"] = meta.get("progress", 50)
-                local_jobs[job_id]["step"] = meta.get("step", "procesando")
+            _save_local_job(
+                job_id=job_id,
+                status=state,
+                progress=meta.get("progress", 50),
+                step=meta.get("step", "procesando"),
+            )
 
     with pipeline_lock:
         try:
-            local_jobs[job_id] = {"status": "STARTED", "progress": 10, "step": "iniciando"}
+            _save_local_job(job_id=job_id, status="STARTED", progress=10, step="iniciando")
             fake_task = TaskContext()
             res = execute_song_pipeline(
                 task_context=fake_task,
@@ -87,19 +182,21 @@ def run_direct_process(
                 artist_name=artist_name,
                 identifier=identifier,
             )
-            local_jobs[job_id] = {
-                "status": "SUCCESS",
-                "progress": 100,
-                "step": "completado",
-                "result": res,
-            }
+            _save_local_job(
+                job_id=job_id,
+                status="SUCCESS",
+                progress=100,
+                step="completado",
+                result=res,
+            )
         except Exception as e:
-            local_jobs[job_id] = {
-                "status": "FAILURE",
-                "progress": 0,
-                "step": "error",
-                "error": str(e),
-            }
+            _save_local_job(
+                job_id=job_id,
+                status="FAILURE",
+                progress=0,
+                step="error",
+                error=str(e),
+            )
 
 
 ALLOWED_EXTENSIONS = {".mp3", ".wav", ".ogg", ".m4a", ".webm"}
@@ -190,7 +287,7 @@ async def upload_audio_file(
 
     if not job_id:
         job_id = str(uuid.uuid4())
-        local_jobs[job_id] = {"status": "STARTED", "progress": 10, "step": "iniciando"}
+        _save_local_job(job_id=job_id, status="STARTED", progress=10, step="iniciando")
         background_tasks.add_task(
             run_direct_process,
             job_id=job_id,
@@ -247,7 +344,7 @@ async def process_song_url(
 
     if not job_id:
         job_id = str(uuid.uuid4())
-        local_jobs[job_id] = {"status": "STARTED", "progress": 10, "step": "iniciando"}
+        _save_local_job(job_id=job_id, status="STARTED", progress=10, step="iniciando")
         background_tasks.add_task(
             run_direct_process,
             job_id=job_id,
@@ -275,9 +372,9 @@ async def get_job_status(job_id: str) -> SongJobStatus:
     Permite al frontend hacer polling periódico para conocer el progreso
     de la tarea (PENDING → STARTED → SUCCESS / FAILURE).
     """
-    # 1. Si se ejecutó en el pool local de BackgroundTasks
-    if job_id in local_jobs:
-        info = local_jobs[job_id]
+    # 1. Si se ejecutó en el pool local de BackgroundTasks (con caché persistente SQLite)
+    info = _get_local_job(job_id)
+    if info:
         return SongJobStatus(
             job_id=job_id,
             status=info.get("status", "STARTED"),
@@ -353,8 +450,8 @@ async def stream_audio_file(job_id: str):
     en la vista de Karaoke Interactivo.
     """
     audio_path = None
-    if job_id in local_jobs:
-        job = local_jobs[job_id]
+    job = _get_local_job(job_id)
+    if job:
         res = job.get("result")
         if res and isinstance(res, dict):
             audio_path = res.get("audio_path")

@@ -120,7 +120,8 @@ export async function pollJobUntilComplete(
 ): Promise<ProcessedSongResult> {
   return new Promise((resolve, reject) => {
     let consecutiveErrors = 0;
-    const maxErrors = 12;
+    let notFoundRetries = 0;
+    const maxErrors = 25;
 
     const check = async () => {
       try {
@@ -141,6 +142,13 @@ export async function pollJobUntilComplete(
         }
 
         if (current.status === "FAILURE") {
+          // Si el servidor acaba de sincronizar el hilo local, reintentar 3 veces antes de fallar
+          if (current.error?.toLowerCase().includes("no encontrada") && notFoundRetries < 3) {
+            notFoundRetries += 1;
+            setTimeout(check, 2500);
+            return;
+          }
+
           reject(
             new Error(
               current.error || "Ocurrió un error durante el procesamiento del audio"
@@ -160,7 +168,7 @@ export async function pollJobUntilComplete(
           reject(err);
         } else {
           // Si el servidor en la nube está temporalmente ocupado (503/429), aplicar backoff sin abortar
-          const backoffDelay = isTransient ? intervalMs * 2 : intervalMs * 1.5;
+          const backoffDelay = isTransient ? 3500 : 2500;
           setTimeout(check, backoffDelay);
         }
       }

@@ -185,20 +185,18 @@ class LyricsService:
             async with httpx.AsyncClient(timeout=self.timeout, headers=headers) as client:
                 # 1. Si tenemos título y artista claros, intentar coincidencia exacta /get
                 if clean_title and clean_artist:
-                    params: dict[str, str | int] = {
-                        "track_name": clean_title,
-                        "artist_name": clean_artist,
-                    }
-                    if duration and duration > 0:
-                        params["duration"] = int(round(duration))
-
-                    try:
-                        res = await client.get(f"{self.LRCLIB_BASE_URL}/get", params=params)
-                        if res.status_code == 200:
-                            data = res.json()
-                            item_dur = float(data.get("duration") or 0.0)
-                            # Validar que coincida con la duración acústica del audio (tolerancia ±22s para intros/silencios de YouTube)
-                            if not duration or duration <= 0 or item_dur <= 0 or abs(item_dur - duration) <= 22.0:
+                    # Intento 1A: con duración si está disponible
+                    for try_params in [
+                        {"track_name": clean_title, "artist_name": clean_artist, "duration": int(round(duration))}
+                        if duration and duration > 0 else None,
+                        {"track_name": clean_title, "artist_name": clean_artist},
+                    ]:
+                        if try_params is None:
+                            continue
+                        try:
+                            res = await client.get(f"{self.LRCLIB_BASE_URL}/get", params=try_params)
+                            if res.status_code == 200:
+                                data = res.json()
                                 synced_lrc = data.get("syncedLyrics")
                                 plain_lyrics = data.get("plainLyrics")
                                 if synced_lrc:
@@ -210,10 +208,25 @@ class LyricsService:
                                         title=data.get("trackName") or clean_title,
                                         artist=data.get("artistName") or clean_artist,
                                     )
-                    except Exception:
-                        pass
+                                elif plain_lyrics:
+                                    raw_lines = [l.strip() for l in plain_lyrics.splitlines() if l.strip()]
+                                    total = len(raw_lines)
+                                    step = (duration / total) if total > 0 and duration and duration > 0 else 4.0
+                                    return LyricsResult(
+                                        is_synced=True,
+                                        source="lrclib",
+                                        lines=[
+                                            LyricLine(time=round(i * step, 2), text=text)
+                                            for i, text in enumerate(raw_lines)
+                                        ],
+                                        plain_lyrics=plain_lyrics,
+                                        title=data.get("trackName") or clean_title,
+                                        artist=data.get("artistName") or clean_artist,
+                                    )
+                        except Exception:
+                            pass
 
-                # 2. Iterar sobre los queries de búsqueda inteligentes con filtro acústico
+                # 2. Iterar sobre los queries de búsqueda inteligentes con filtro flexible
                 for query in search_queries:
                     try:
                         search_res = await client.get(
@@ -223,7 +236,7 @@ class LyricsService:
                         # Reintentar brevemente si LRCLIB está sobrecargado (503)
                         if search_res.status_code == 503:
                             import asyncio
-                            await asyncio.sleep(0.4)
+                            await asyncio.sleep(0.3)
                             search_res = await client.get(
                                 f"{self.LRCLIB_BASE_URL}/search", params={"q": query}
                             )
@@ -231,38 +244,42 @@ class LyricsService:
                         if search_res.status_code == 200:
                             items = search_res.json()
                             if isinstance(items, list) and len(items) > 0:
-                                # Validación acústica: permitir intros/outros comunes en YouTube (±22s)
-                                valid_items = []
+                                # Validación acústica: permitir intros/outros comunes en YouTube (tolerancia ±40s)
+                                candidate = None
                                 if duration and duration > 0:
-                                    valid_items = [
+                                    close_synced = [
                                         it for it in items
-                                        if it.get("duration") and abs(float(it.get("duration", 0)) - duration) <= 22.0
+                                        if it.get("syncedLyrics") and it.get("duration") and abs(float(it.get("duration", 0)) - duration) <= 40.0
                                     ]
-                                    # Si no hubo coincidencia en ±22s, buscar el candidato más cercano en ±45s
-                                    if not valid_items:
-                                        sorted_by_dur = sorted(
-                                            [it for it in items if it.get("duration")],
-                                            key=lambda it: abs(float(it.get("duration", 0)) - duration),
-                                        )
-                                        if sorted_by_dur and abs(float(sorted_by_dur[0].get("duration", 0)) - duration) <= 45.0:
-                                            valid_items = [sorted_by_dur[0]]
+                                    if close_synced:
+                                        candidate = close_synced[0]
+                                    else:
+                                        close_plain = [
+                                            it for it in items
+                                            if it.get("plainLyrics") and it.get("duration") and abs(float(it.get("duration", 0)) - duration) <= 40.0
+                                        ]
+                                        if close_plain:
+                                            candidate = close_plain[0]
                                 else:
-                                    valid_items = items
+                                    any_synced = [it for it in items if it.get("syncedLyrics")]
+                                    if any_synced:
+                                        candidate = any_synced[0]
+                                    else:
+                                        any_plain = [it for it in items if it.get("plainLyrics")]
+                                        if any_plain:
+                                            candidate = any_plain[0]
 
-                                if valid_items:
-                                    # Priorizar el primer resultado acústicamente válido que tenga letras sincronizadas
-                                    best_item = next((it for it in valid_items if it.get("syncedLyrics")), valid_items[0])
-                                    synced_lrc = best_item.get("syncedLyrics")
-                                    plain_lyrics = best_item.get("plainLyrics")
-
+                                if candidate:
+                                    synced_lrc = candidate.get("syncedLyrics")
+                                    plain_lyrics = candidate.get("plainLyrics")
                                     if synced_lrc:
                                         return LyricsResult(
                                             is_synced=True,
                                             source="lrclib",
                                             lines=self.parse_lrc(synced_lrc),
                                             plain_lyrics=plain_lyrics,
-                                            title=best_item.get("trackName") or clean_title,
-                                            artist=best_item.get("artistName") or clean_artist,
+                                            title=candidate.get("trackName") or clean_title,
+                                            artist=candidate.get("artistName") or clean_artist,
                                         )
                                     elif plain_lyrics:
                                         raw_lines = [l.strip() for l in plain_lyrics.splitlines() if l.strip()]
@@ -276,8 +293,8 @@ class LyricsService:
                                                 for i, text in enumerate(raw_lines)
                                             ],
                                             plain_lyrics=plain_lyrics,
-                                            title=best_item.get("trackName") or clean_title,
-                                            artist=best_item.get("artistName") or clean_artist,
+                                            title=candidate.get("trackName") or clean_title,
+                                            artist=candidate.get("artistName") or clean_artist,
                                         )
                     except Exception:
                         continue

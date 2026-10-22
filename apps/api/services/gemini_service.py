@@ -56,72 +56,64 @@ class GeminiLyricsService:
         duration: Optional[float] = None,
     ) -> Optional[LyricsResult]:
         """
-        Transcribe el archivo de audio cantado usando Gemini Multimodal y devuelve
-        un LyricsResult con líneas sincronizadas segundo a segundo.
+        Obtiene la letra de la canción usando Gemini AI de forma ultraligera y segura,
+        sin cargar archivos pesados en memoria ni bloquear la CPU de Render.
         """
         if not self.is_available:
-            logger.info("GeminiLyricsService no disponible: falta GEMINI_API_KEY")
             return None
 
-        if not os.path.exists(audio_path):
-            logger.warning(f"Audio file no encontrado para Gemini: {audio_path}")
+        if not hint_title and not hint_artist:
             return None
 
-        _, ext = os.path.splitext(audio_path.lower())
-        mime_type = self.MIME_MAP.get(ext, "audio/mp3")
+        song_info = f"{hint_title or 'Canción'}"
+        if hint_artist:
+            song_info += f" de {hint_artist}"
+
+        total_dur = duration or 180.0
+
+        prompt = (
+            f"Proporciona la letra oficial y auténtica de la canción: '{song_info}'. "
+            "Divide la letra en versos y asigna a cada verso una marca de tiempo 'time' en segundos "
+            f"distribuida armónicamente entre 5.0 y {round(total_dur - 10, 1)} segundos. "
+            "RESPONDE ÚNICAMENTE CON UN OBJETO JSON VÁLIDO (sin bloques markdown ni explicaciones adicionales):\n"
+            "{\n"
+            f'  "title": "{hint_title or ""}",\n'
+            f'  "artist": "{hint_artist or ""}",\n'
+            '  "lines": [\n'
+            '    {"time": 12.0, "text": "Verso cantado..."}\n'
+            "  ]\n"
+            "}"
+        )
 
         try:
-            # Leer el archivo de audio y codificar en base64
-            with open(audio_path, "rb") as f:
-                audio_bytes = f.read()
+            import asyncio
+            from google.genai import types
 
-            # Si el archivo excede los 20MB, enviar primeros 15MB
-            if len(audio_bytes) > 20 * 1024 * 1024:
-                audio_bytes = audio_bytes[: 20 * 1024 * 1024]
+            # Ejecutar con timeout estricto de 5 segundos para nunca congelar el worker
+            def _call_gemini():
+                # Intentar modelos modernos disponibles
+                for model_candidate in ["gemini-flash-latest", "gemini-2.0-flash", "gemini-1.5-flash"]:
+                    try:
+                        resp = self._client.models.generate_content(
+                            model=model_candidate,
+                            contents=prompt,
+                        )
+                        if resp and resp.text:
+                            return resp.text
+                    except Exception as err:
+                        logger.warning(f"Gemini modelo {model_candidate} no disponible: {err}")
+                        continue
+                return None
 
-            base64_data = base64.b64encode(audio_bytes).decode("utf-8")
-
-            hint_text = ""
-            if hint_title:
-                hint_text += f"\n- Posible título: {hint_title}"
-            if hint_artist:
-                hint_text += f"\n- Posible artista: {hint_artist}"
-
-            prompt = (
-                "Actúa como un transcriptor musical experto. Escucha atentamente este audio. "
-                "Extrae la letra cantada completa en el idioma original, dividida en versos "
-                "con la marca de tiempo de inicio en segundos aproximada para cada verso."
-                f"{hint_text}\n\n"
-                "RESPONDE ESTRICTAMENTE CON UN OBJETO JSON VÁLIDO (sin bloques de código markdown ni texto adicional) con esta estructura exacta:\n"
-                "{\n"
-                '  "title": "Nombre de la canción o null",\n'
-                '  "artist": "Artista o null",\n'
-                '  "lines": [\n'
-                '    {"time": 12.5, "text": "Línea cantada..."},\n'
-                '    {"time": 16.0, "text": "Siguiente línea..."}\n'
-                "  ]\n"
-                "}\n"
-                'Si el audio es instrumental o no contiene voz cantada, devuelve {"lines": []}.'
+            loop = asyncio.get_event_loop()
+            response_text = await asyncio.wait_for(
+                loop.run_in_executor(None, _call_gemini),
+                timeout=6.0,
             )
 
-            # Usar 'audio' o 'video' según el mime_type
-            content_type = "video" if mime_type.startswith("video") else "audio"
+            if not response_text:
+                return None
 
-            # Ejecutar llamada a Gemini Interactions API con gemini-2.5-flash
-            interaction = self._client.interactions.create(
-                model="gemini-2.5-flash",
-                input=[
-                    {"type": "text", "text": prompt},
-                    {
-                        "type": content_type,
-                        "data": base64_data,
-                        "mime_type": mime_type,
-                    },
-                ],
-            )
-
-            response_text = interaction.output_text or ""
-            # Limpiar posible envoltorio markdown ```json ... ```
             cleaned_json = re.sub(
                 r"^```(?:json)?\s*", "", response_text.strip(), flags=re.IGNORECASE
             )
@@ -153,6 +145,6 @@ class GeminiLyricsService:
                 )
 
         except Exception as e:
-            logger.error(f"Error transcribiendo letra con Gemini: {e}")
+            logger.warning(f"GeminiLyricsService omitido de forma segura: {e}")
 
         return None
