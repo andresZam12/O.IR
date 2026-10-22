@@ -107,9 +107,9 @@ class GeminiLyricsService:
             # Usar 'audio' o 'video' según el mime_type
             content_type = "video" if mime_type.startswith("video") else "audio"
 
-            # Ejecutar llamada a Gemini Interactions API
+            # Ejecutar llamada a Gemini Interactions API con gemini-2.5-flash
             interaction = self._client.interactions.create(
-                model="gemini-flash-latest",
+                model="gemini-2.5-flash",
                 input=[
                     {"type": "text", "text": prompt},
                     {

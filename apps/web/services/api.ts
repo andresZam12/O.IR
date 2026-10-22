@@ -120,7 +120,7 @@ export async function pollJobUntilComplete(
 ): Promise<ProcessedSongResult> {
   return new Promise((resolve, reject) => {
     let consecutiveErrors = 0;
-    const maxErrors = 5;
+    const maxErrors = 12;
 
     const check = async () => {
       try {
@@ -149,15 +149,19 @@ export async function pollJobUntilComplete(
           return;
         }
 
-        // Continuar haciendo polling
+        // Continuar haciendo polling normalmente
         setTimeout(check, intervalMs);
-      } catch (err) {
+      } catch (err: unknown) {
         consecutiveErrors += 1;
+        const errMsg = err instanceof Error ? err.message : String(err);
+        const isTransient = errMsg.includes("503") || errMsg.includes("429");
+
         if (consecutiveErrors >= maxErrors) {
           reject(err);
         } else {
-          // Reintentar tras un breve retraso por si el servidor estaba reiniciando
-          setTimeout(check, intervalMs * 1.5);
+          // Si el servidor en la nube está temporalmente ocupado (503/429), aplicar backoff sin abortar
+          const backoffDelay = isTransient ? intervalMs * 2 : intervalMs * 1.5;
+          setTimeout(check, backoffDelay);
         }
       }
     };

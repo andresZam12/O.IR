@@ -197,8 +197,8 @@ class LyricsService:
                         if res.status_code == 200:
                             data = res.json()
                             item_dur = float(data.get("duration") or 0.0)
-                            # Validar que coincida estrictamente con la duración acústica del audio (± 4.5s)
-                            if not duration or duration <= 0 or item_dur <= 0 or abs(item_dur - duration) <= 4.5:
+                            # Validar que coincida con la duración acústica del audio (tolerancia ±22s para intros/silencios de YouTube)
+                            if not duration or duration <= 0 or item_dur <= 0 or abs(item_dur - duration) <= 22.0:
                                 synced_lrc = data.get("syncedLyrics")
                                 plain_lyrics = data.get("plainLyrics")
                                 if synced_lrc:
@@ -231,13 +231,21 @@ class LyricsService:
                         if search_res.status_code == 200:
                             items = search_res.json()
                             if isinstance(items, list) and len(items) > 0:
-                                # Validación acústica estricta: descartar cualquier candidato cuya duración
-                                # difiera por más de 4.5 segundos respecto al archivo de audio físico procesado
+                                # Validación acústica: permitir intros/outros comunes en YouTube (±22s)
+                                valid_items = []
                                 if duration and duration > 0:
                                     valid_items = [
                                         it for it in items
-                                        if it.get("duration") and abs(float(it.get("duration", 0)) - duration) <= 4.5
+                                        if it.get("duration") and abs(float(it.get("duration", 0)) - duration) <= 22.0
                                     ]
+                                    # Si no hubo coincidencia en ±22s, buscar el candidato más cercano en ±45s
+                                    if not valid_items:
+                                        sorted_by_dur = sorted(
+                                            [it for it in items if it.get("duration")],
+                                            key=lambda it: abs(float(it.get("duration", 0)) - duration),
+                                        )
+                                        if sorted_by_dur and abs(float(sorted_by_dur[0].get("duration", 0)) - duration) <= 45.0:
+                                            valid_items = [sorted_by_dur[0]]
                                 else:
                                     valid_items = items
 

@@ -119,17 +119,10 @@ class ChordDetectionService:
             )
 
         # 2. Calcular cromagrama ultrarrápido y robusto mediante STFT (Short-Time Fourier Transform)
-        # Optimizamos n_fft y estimación de afinación (tuning) en una ventana inicial de audio.
-        # Esto reduce el tiempo de cómputo de 60-90 segundos (CQT) a ~1-2 segundos (STFT)
-        # sin saturar la CPU ni la memoria en servidores en la nube como Render.
+        # Optimizamos n_fft y usamos afinación estándar de concierto (440 Hz, tuning=0.0).
+        # Esto elimina 35-50 segundos de cálculo intensivo de CPU (piptrack),
+        # reduciendo el análisis a menos de 1 segundo sin saturar la CPU de Render.
         tuning = 0.0
-        try:
-            sample_len = min(len(audio), int(sample_rate * 30))
-            if sample_len > 1024:
-                tuning = float(librosa.estimate_tuning(y=audio[:sample_len], sr=sample_rate))
-        except Exception:
-            tuning = 0.0
-
         n_fft = min(2048, max(512, 1 << (len(audio) - 1).bit_length())) if len(audio) < 2048 else 2048
 
         chromagram = librosa.feature.chroma_stft(
