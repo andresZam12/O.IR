@@ -20,26 +20,31 @@ const styles = StyleSheet.create({
     color: "#0f172a",
     position: "relative",
   },
-  // Marca de agua de O.IR que abarca la mayoría de la página
-  watermarkWrapper: {
+  // Patrón de marcas de agua repetidas de O.IR que cubren toda la página
+  watermarkGrid: {
     position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
+    top: -20,
+    left: -20,
+    right: -20,
+    bottom: -20,
     display: "flex",
     flexDirection: "column",
     justifyContent: "space-around",
-    alignItems: "center",
     zIndex: -1,
   },
-  watermarkText: {
-    fontSize: 140,
+  watermarkRow: {
+    display: "flex",
+    flexDirection: "row",
+    justifyContent: "space-around",
+    alignItems: "center",
+  },
+  watermarkItem: {
+    fontSize: 52,
     fontFamily: "Helvetica-Bold",
     color: "#000000",
-    opacity: 0.045,
-    transform: "rotate(-35deg)",
-    letterSpacing: 10,
+    opacity: 0.055,
+    transform: "rotate(-28deg)",
+    letterSpacing: 4,
     textTransform: "lowercase",
   },
   // Encabezado principal: únicamente Título, Artista y Tonalidad
@@ -298,10 +303,17 @@ export default function SongPdfDocument({ data }: SongPdfDocumentProps) {
   return (
     <Document>
       <Page size="A4" style={styles.page}>
-        {/* Marca de agua grande fija de O.IR que abarca la mayoría de cada página */}
-        <View style={styles.watermarkWrapper} fixed>
-          <Text style={styles.watermarkText}>o.ir</Text>
-          <Text style={styles.watermarkText}>o.ir</Text>
+        {/* Patrón de marcas de agua repetidas de O.IR por toda la página y en todas las páginas */}
+        <View style={styles.watermarkGrid} fixed>
+          {Array.from({ length: 7 }).map((_, rIdx) => (
+            <View key={rIdx} style={styles.watermarkRow}>
+              {Array.from({ length: 4 }).map((_, cIdx) => (
+                <Text key={cIdx} style={styles.watermarkItem}>
+                  o.ir
+                </Text>
+              ))}
+            </View>
+          ))}
         </View>
 
         {/* Encabezado: Título, Artista y Tonalidad únicamente */}

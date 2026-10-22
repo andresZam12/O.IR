@@ -247,14 +247,16 @@ export default function ChordSheetView({
       id="printable-cancionero"
       className="card relative w-full max-w-4xl mx-auto shadow-2xl border-slate-800 bg-[#0b0f19] p-6 sm:p-10 print:bg-white print:text-black print:border-none print:shadow-none print:p-0 print:m-0"
     >
-      {/* Marcas de agua muy grandes de O.IR que abarcan la mayoría de la página en impresión/PDF */}
-      <div className="hidden print:flex fixed inset-0 pointer-events-none items-center justify-around flex-col -z-10 select-none overflow-hidden opacity-[0.05]">
-        <span className="text-[140px] font-black text-black -rotate-35 tracking-[0.25em] uppercase select-none">
-          o.ir
-        </span>
-        <span className="text-[140px] font-black text-black -rotate-35 tracking-[0.25em] uppercase select-none">
-          o.ir
-        </span>
+      {/* Patrón de marcas de agua repetidas de O.IR por toda la página en impresión/PDF */}
+      <div className="hidden print:grid fixed inset-0 pointer-events-none grid-cols-4 grid-rows-7 gap-y-12 gap-x-6 items-center justify-items-center -z-10 select-none overflow-hidden opacity-[0.065]">
+        {Array.from({ length: 28 }).map((_, idx) => (
+          <span
+            key={idx}
+            className="text-4xl font-black text-black -rotate-30 tracking-[0.2em] uppercase select-none"
+          >
+            o.ir
+          </span>
+        ))}
       </div>
 
       {/* Encabezado limpio de la partitura: Título, Artista y Tonalidad */}
