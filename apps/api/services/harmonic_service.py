@@ -222,16 +222,30 @@ class HarmonicEnrichmentService:
                 "}"
             )
 
-            # Usar gemini-3.5-flash-lite con timeout estricto de 4 segundos
-            resp = self._client.models.generate_content(
-                model="gemini-3.5-flash-lite",
-                contents=prompt,
-            )
+            import concurrent.futures
 
-            if not resp or not resp.text:
+            def _call_model():
+                try:
+                    r = self._client.models.generate_content(
+                        model="gemini-3.5-flash-lite",
+                        contents=prompt,
+                    )
+                    return r.text if (r and r.text) else None
+                except Exception as err:
+                    logger.warning(f"Harmonic Gemini error: {err}")
+                    return None
+
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+                fut = executor.submit(_call_model)
+                try:
+                    resp_text = fut.result(timeout=3.5)
+                except Exception:
+                    resp_text = None
+
+            if not resp_text:
                 return None
 
-            cleaned_json = re.sub(r"^```(?:json)?\s*", "", resp.text.strip(), flags=re.IGNORECASE)
+            cleaned_json = re.sub(r"^```(?:json)?\s*", "", resp_text.strip(), flags=re.IGNORECASE)
             cleaned_json = re.sub(r"\s*```$", "", cleaned_json.strip())
             data = json.loads(cleaned_json)
 

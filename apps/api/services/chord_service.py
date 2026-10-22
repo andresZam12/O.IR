@@ -89,7 +89,7 @@ class ChordDetectionService:
         """
         # 1. Cargar audio en mono con frecuencia optimizada para análisis armónico (sr=11025)
         # Esto reduce el consumo de memoria RAM en más del 70%, ideal para el tier gratuito de Render (512MB)
-        audio, sample_rate = librosa.load(audio_path, sr=11025, mono=True, duration=300)
+        audio, sample_rate = librosa.load(audio_path, sr=11025, mono=True, duration=210)
         duration = float(librosa.get_duration(y=audio, sr=sample_rate))
 
         return self.detect_chords_from_audio(audio, sample_rate, duration)

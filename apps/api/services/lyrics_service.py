@@ -299,44 +299,6 @@ class LyricsService:
                     except Exception:
                         continue
 
-                # 3. Fallback a API secundaria de letras (lyrics.ovh)
-                candidate_pairs = []
-                if clean_artist and clean_title:
-                    candidate_pairs.append((clean_artist, clean_title))
-                if " - " in track_name:
-                    p1, p2 = [p.strip() for p in track_name.split(" - ", 1)]
-                    candidate_pairs.append((p1, p2))
-                    candidate_pairs.append((p2, p1))
-
-                for art, trk in candidate_pairs:
-                    try:
-                        clean_art_encoded = re.sub(r"[^\w\s]", "", art).strip()
-                        clean_trk_encoded = re.sub(r"[^\w\s]", "", trk).strip()
-                        ovh_res = await client.get(
-                            f"https://api.lyrics.ovh/v1/{clean_art_encoded}/{clean_trk_encoded}",
-                            timeout=4.0,
-                        )
-                        if ovh_res.status_code == 200:
-                            data = ovh_res.json()
-                            lyrics_text = data.get("lyrics", "").strip()
-                            if lyrics_text:
-                                raw_lines = [l.strip() for l in lyrics_text.splitlines() if l.strip()]
-                                total = len(raw_lines)
-                                step = (duration / total) if total > 0 and duration and duration > 0 else 4.0
-                                return LyricsResult(
-                                    is_synced=True,
-                                    source="lyrics_ovh",
-                                    lines=[
-                                        LyricLine(time=round(i * step, 2), text=text)
-                                        for i, text in enumerate(raw_lines)
-                                    ],
-                                    plain_lyrics=lyrics_text,
-                                    title=trk,
-                                    artist=art,
-                                )
-                    except Exception:
-                        continue
-
         except Exception:
             pass
 

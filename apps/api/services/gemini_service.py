@@ -86,30 +86,25 @@ class GeminiLyricsService:
         )
 
         try:
-            import asyncio
-            from google.genai import types
+            import concurrent.futures
 
-            # Ejecutar con timeout estricto de 5 segundos para nunca congelar el worker
             def _call_gemini():
-                # Intentar modelos modernos disponibles
-                for model_candidate in ["gemini-flash-latest", "gemini-2.0-flash", "gemini-1.5-flash"]:
-                    try:
-                        resp = self._client.models.generate_content(
-                            model=model_candidate,
-                            contents=prompt,
-                        )
-                        if resp and resp.text:
-                            return resp.text
-                    except Exception as err:
-                        logger.warning(f"Gemini modelo {model_candidate} no disponible: {err}")
-                        continue
-                return None
+                try:
+                    resp = self._client.models.generate_content(
+                        model="gemini-3.5-flash-lite",
+                        contents=prompt,
+                    )
+                    return resp.text if (resp and resp.text) else None
+                except Exception as err:
+                    logger.warning(f"Gemini API llamada no completada: {err}")
+                    return None
 
-            loop = asyncio.get_event_loop()
-            response_text = await asyncio.wait_for(
-                loop.run_in_executor(None, _call_gemini),
-                timeout=6.0,
-            )
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+                fut = executor.submit(_call_gemini)
+                try:
+                    response_text = fut.result(timeout=3.5)
+                except Exception:
+                    response_text = None
 
             if not response_text:
                 return None
