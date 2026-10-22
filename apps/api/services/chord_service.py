@@ -206,11 +206,11 @@ class ChordDetectionService:
         )
 
     def _compress_chord_sequence(
-        self, chords: list[ChordItem], min_duration_s: float = 2.2
+        self, chords: list[ChordItem], min_duration_s: float = 1.0
     ) -> list[ChordItem]:
         """
-        Elimina redundancias consecutivas, filtra micro-transitorios y simplifica la progresión
-        a bloques armónicos estables y accesibles para músicos principiantes (mínimo ~2.2 segundos por acorde).
+        Agrupa acordes consecutivos idénticos y filtra únicamente micro-transitorios
+        técnicamente ruidosos (< 0.8s), preservando todos los cambios armónicos reales.
         """
         if not chords:
             return []
@@ -232,64 +232,33 @@ class ChordDetectionService:
         if not blocks:
             return []
 
-        # 2. Simplificación iterativa para principiantes: fusionar acordes fugaces (< min_duration_s)
-        # en el acorde dominante vecino más largo o con mayor confianza
-        merged_blocks = [dict(b) for b in blocks]
-        changed = True
-        iterations = 0
+        # 2. Filtrar únicamente bloques ultracortos (< 0.8s) absorbiéndolos en el bloque previo
+        filtered: list[dict] = []
+        for b in blocks:
+            dur = b["end_time"] - b["start_time"]
+            if dur < 0.8 and filtered and len(blocks) > 3:
+                filtered[-1]["end_time"] = b["end_time"]
+            else:
+                filtered.append(b)
 
-        while changed and iterations < 5:
-            changed = False
-            iterations += 1
-            new_blocks: list[dict] = []
-            i = 0
-            while i < len(merged_blocks):
-                curr = merged_blocks[i]
-                dur = curr["end_time"] - curr["start_time"]
+        # 3. Combinar bloques adyacentes que hayan quedado con el mismo acorde
+        consolidated: list[dict] = []
+        for b in filtered:
+            if not consolidated or consolidated[-1]["chord"] != b["chord"]:
+                consolidated.append(b)
+            else:
+                consolidated[-1]["end_time"] = b["end_time"]
+                consolidated[-1]["conf"] = max(consolidated[-1]["conf"], b["conf"])
 
-                # Si el bloque es fugaz (< min_duration_s) y hay más acordes en la canción
-                if dur < min_duration_s and len(merged_blocks) > 2:
-                    changed = True
-                    # Decidir si anexar al acorde anterior o al siguiente
-                    if new_blocks and (i + 1 < len(merged_blocks)):
-                        prev_dur = new_blocks[-1]["end_time"] - new_blocks[-1]["start_time"]
-                        next_dur = merged_blocks[i + 1]["end_time"] - merged_blocks[i + 1]["start_time"]
-                        if prev_dur >= next_dur:
-                            new_blocks[-1]["end_time"] = curr["end_time"]
-                        else:
-                            merged_blocks[i + 1]["start_time"] = curr["start_time"]
-                    elif new_blocks:
-                        new_blocks[-1]["end_time"] = curr["end_time"]
-                    elif i + 1 < len(merged_blocks):
-                        merged_blocks[i + 1]["start_time"] = curr["start_time"]
-                    else:
-                        new_blocks.append(curr)
-                else:
-                    new_blocks.append(curr)
-                i += 1
-
-            # Combinar adyacentes que hayan quedado con el mismo acorde
-            consolidated: list[dict] = []
-            for b in new_blocks:
-                if not consolidated or consolidated[-1]["chord"] != b["chord"]:
-                    consolidated.append(b)
-                else:
-                    consolidated[-1]["end_time"] = b["end_time"]
-                    consolidated[-1]["conf"] = max(consolidated[-1]["conf"], b["conf"])
-
-            merged_blocks = consolidated
-
-        # 3. Mapear a ChordItem final
         result: list[ChordItem] = []
-        for b in merged_blocks:
-            if not result or result[-1].chord != b["chord"]:
-                result.append(
-                    ChordItem(
-                        time=round(b["start_time"], 2),
-                        chord=b["chord"],
-                        confidence=round(b["conf"], 3),
-                    )
+        for b in consolidated:
+            result.append(
+                ChordItem(
+                    time=round(b["start_time"], 2),
+                    chord=b["chord"],
+                    confidence=round(b["conf"], 3),
                 )
+            )
 
         return result if result else [chords[0]]
 
