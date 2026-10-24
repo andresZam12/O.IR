@@ -118,10 +118,9 @@ class AudioService:
             "quiet": True,
             "no_warnings": True,
             "noplaylist": True,
-            "socket_timeout": 20,
-            "retries": 2,
+            "socket_timeout": 25,
+            "retries": 3,
             "max_filesize": 100 * 1024 * 1024 if is_video else 60 * 1024 * 1024,
-            "js_runtimes": {"node": {}},
         }
 
         if proxy and proxy.strip():
@@ -136,14 +135,15 @@ class AudioService:
             po_arg = token_clean if "+" in token_clean else f"web+{token_clean}"
             strategies = [
                 {"extractor_args": {"youtube": {"po_token": [po_arg], "player_client": ["web"]}}},
-                {"extractor_args": {"youtube": {"player_client": ["web"]}}},
+                {"extractor_args": {"youtube": {"player_client": ["mweb"]}}},
+                {"extractor_args": {"youtube": {"player_client": ["ios"]}}},
                 {},
             ]
         elif proxy and proxy.strip():
             # Con proxy residencial, las peticiones emulan usuarios reales de ISP hogareño
             strategies = [
                 {},
-                {"extractor_args": {"youtube": {"player_client": ["android", "ios", "web"]}}},
+                {"extractor_args": {"youtube": {"player_client": ["android", "ios", "mweb"]}}},
                 {"extractor_args": {"youtube": {"player_client": ["web"]}}},
             ]
         elif cookie_path and os.path.exists(cookie_path):
@@ -151,14 +151,17 @@ class AudioService:
             strategies = [
                 {},
                 {"extractor_args": {"youtube": {"player_client": ["web"]}}},
+                {"extractor_args": {"youtube": {"player_client": ["mweb"]}}},
             ]
         else:
-            # Estrategias de fallback ligero para centros de datos
+            # Estrategias prioritarias para centros de datos (Render/AWS): mweb e ios evaden el bot-challenge web
             strategies = [
+                {"extractor_args": {"youtube": {"player_client": ["mweb"]}}},
+                {"extractor_args": {"youtube": {"player_client": ["ios"]}}},
+                {"extractor_args": {"youtube": {"player_client": ["android"]}}},
+                {"extractor_args": {"youtube": {"player_client": ["tv_embedded"]}}},
+                {"extractor_args": {"youtube": {"player_client": ["android_creator"]}}},
                 {},
-                {"extractor_args": {"youtube": {"player_client": ["tv", "web"]}}},
-                {"extractor_args": {"youtube": {"player_client": ["web"]}}},
-                {"extractor_args": {"youtube": {"player_client": ["ios", "web"]}}},
             ]
 
         last_error = None
@@ -209,10 +212,7 @@ class AudioService:
                 if isinstance(e, ValueError):
                     raise
                 last_error = e
-                err_str = str(e).lower()
-                # Si es un error de bot o límite de YouTube, no tiene sentido reintentar todas las estrategias
-                if "not a bot" in err_str or "sign in" in err_str:
-                    break
+                # Continuar con la siguiente estrategia de cliente (mweb, ios, android) sin romper prematuramente
                 continue
 
         # Canal alternativo de alta resiliencia si yt-dlp fue bloqueado por restricciones de datacenter de YouTube
