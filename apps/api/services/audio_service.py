@@ -110,7 +110,7 @@ class AudioService:
                 pass
 
         is_video = media_format.lower() == "mp4"
-        format_spec = "best[ext=mp4]/best" if is_video else "ba[ext=m4a]/ba/b/bestaudio/best"
+        format_spec = "best[ext=mp4]/best" if is_video else "ba/bestaudio/b/best"
 
         base_opts = {
             "format": format_spec,
@@ -123,45 +123,65 @@ class AudioService:
             "max_filesize": 100 * 1024 * 1024 if is_video else 60 * 1024 * 1024,
         }
 
+        # Si no es video y ffmpeg está disponible en el servidor (como en Render Docker), convertir a mp3 real
+        if not is_video:
+            import shutil
+            if shutil.which("ffmpeg"):
+                base_opts["postprocessors"] = [{
+                    "key": "FFmpegExtractAudio",
+                    "preferredcodec": "mp3",
+                    "preferredquality": "192",
+                }]
+
         if proxy and proxy.strip():
             base_opts["proxy"] = proxy.strip()
 
         if cookie_path and os.path.exists(cookie_path):
             base_opts["cookiefile"] = cookie_path
 
-        # Selección de estrategias de cliente y evasión
+        # Selección de estrategias de cliente y evasión (el cliente Android no requiere JS runtime ni PO token)
+        android_client = {"extractor_args": {"youtube": {"player_client": ["android"]}}}
+        mweb_client = {"extractor_args": {"youtube": {"player_client": ["mweb"]}}}
+        ios_client = {"extractor_args": {"youtube": {"player_client": ["ios"]}}}
+        web_client = {"extractor_args": {"youtube": {"player_client": ["web"]}}}
+        default_client = {}
+
         if potoken and potoken.strip():
             token_clean = potoken.strip()
             po_arg = token_clean if "+" in token_clean else f"web+{token_clean}"
             strategies = [
                 {"extractor_args": {"youtube": {"po_token": [po_arg], "player_client": ["web"]}}},
-                {"extractor_args": {"youtube": {"player_client": ["mweb"]}}},
-                {"extractor_args": {"youtube": {"player_client": ["ios"]}}},
-                {},
+                android_client,
+                mweb_client,
+                ios_client,
+                default_client,
             ]
         elif proxy and proxy.strip():
             # Con proxy residencial, las peticiones emulan usuarios reales de ISP hogareño
             strategies = [
-                {},
+                android_client,
                 {"extractor_args": {"youtube": {"player_client": ["android", "ios", "mweb"]}}},
-                {"extractor_args": {"youtube": {"player_client": ["web"]}}},
+                web_client,
+                default_client,
             ]
         elif cookie_path and os.path.exists(cookie_path):
-            # Con cookies de sesión
+            # Con cookies de sesión: Android primero (evita fallo de formato por falta de JS runtime), luego fallbacks
             strategies = [
-                {},
-                {"extractor_args": {"youtube": {"player_client": ["web"]}}},
-                {"extractor_args": {"youtube": {"player_client": ["mweb"]}}},
+                android_client,
+                default_client,
+                web_client,
+                mweb_client,
+                ios_client,
             ]
         else:
-            # Estrategias prioritarias para centros de datos (Render/AWS): mweb e ios evaden el bot-challenge web
+            # Estrategias prioritarias para centros de datos (Render/AWS): android y mweb
             strategies = [
-                {"extractor_args": {"youtube": {"player_client": ["mweb"]}}},
-                {"extractor_args": {"youtube": {"player_client": ["ios"]}}},
-                {"extractor_args": {"youtube": {"player_client": ["android"]}}},
+                android_client,
+                mweb_client,
+                ios_client,
                 {"extractor_args": {"youtube": {"player_client": ["tv_embedded"]}}},
                 {"extractor_args": {"youtube": {"player_client": ["android_creator"]}}},
-                {},
+                default_client,
             ]
 
         last_error = None
@@ -182,13 +202,17 @@ class AudioService:
                     title = info.get("title", "Video de YouTube" if is_video else "Canción de YouTube")
                     artist = info.get("uploader") or info.get("channel") or info.get("artist")
 
-                    # 1. Intentar con el nombre preparado por yt-dlp
-                    actual_file = ydl.prepare_filename(info)
+                    # 1. Si no es video y se generó el archivo .mp3 convertido, priorizarlo
+                    mp3_cand = os.path.join(self.DOWNLOAD_DIR, f"{unique_id}.mp3")
+                    if not is_video and os.path.exists(mp3_cand):
+                        actual_file = mp3_cand
+                    else:
+                        actual_file = ydl.prepare_filename(info)
 
                     # 2. Si no existe, buscar coincidencias de unique_id en el directorio de descargas
                     if not os.path.exists(actual_file):
                         pattern = os.path.join(self.DOWNLOAD_DIR, f"{unique_id}*")
-                        matches = glob.glob(pattern)
+                        matches = [m for m in glob.glob(pattern) if not m.endswith(".part")]
                         if matches and os.path.exists(matches[0]):
                             actual_file = matches[0]
                         else:
