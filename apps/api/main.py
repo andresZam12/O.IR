@@ -77,10 +77,10 @@ async def health_check():
         or os.getenv("YOUTUBE_PO_TOKEN", "")
         or getattr(settings, "youtube_potoken", "")
     )
-    proxy_host = proxy_str.split("@")[-1] if "@" in proxy_str else (proxy_str[:15] + "..." if proxy_str else None)
+    proxy_host = proxy_str.split("@")[-1].strip() if "@" in proxy_str else (proxy_str[:15].strip() + "..." if proxy_str else None)
     return {
         "status": "ok",
-        "build": "112-android-tabcookies",
+        "build": "113-node-runtime-fix",
         "python": sys.version,
         "yt_dlp": yv,
         "has_youtube_proxy": bool(proxy_str),

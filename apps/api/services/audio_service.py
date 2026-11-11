@@ -125,6 +125,9 @@ class AudioService:
         is_video = media_format.lower() == "mp4"
         format_spec = "best[ext=mp4]/best" if is_video else "ba/bestaudio/b/best"
 
+        import shutil
+        has_node = bool(shutil.which("node"))
+
         base_opts = {
             "format": format_spec,
             "outtmpl": output_template,
@@ -134,11 +137,16 @@ class AudioService:
             "socket_timeout": 25,
             "retries": 3,
             "max_filesize": 100 * 1024 * 1024 if is_video else 60 * 1024 * 1024,
+            "remote_components": ["ejs:github"],
         }
+
+        # En sistemas con Node.js (como el contenedor Docker en Render), habilitar js_runtimes
+        # para que yt-dlp resuelva desafíos de firma y n-challenge en vez de descartar los streams
+        if has_node:
+            base_opts["js_runtimes"] = {"node": {}}
 
         # Si no es video y ffmpeg está disponible en el servidor (como en Render Docker), convertir a mp3 real
         if not is_video:
-            import shutil
             if shutil.which("ffmpeg"):
                 base_opts["postprocessors"] = [{
                     "key": "FFmpegExtractAudio",
@@ -146,35 +154,44 @@ class AudioService:
                     "preferredquality": "192",
                 }]
 
-        if cookie_path and os.path.exists(cookie_path):
-            base_opts["cookiefile"] = cookie_path
+        has_cookies = bool(cookie_path and os.path.exists(cookie_path))
+        cookie_arg = {"cookiefile": cookie_path} if has_cookies else {}
 
-        # Selección de estrategias de cliente y evasión (el cliente Android no requiere JS runtime ni PO token)
+        # Selección de perfiles de cliente
         android_client = {"extractor_args": {"youtube": {"player_client": ["android"]}}}
+        tv_client = {"extractor_args": {"youtube": {"player_client": ["tv_embedded"]}}}
+        default_client = {}
         mweb_client = {"extractor_args": {"youtube": {"player_client": ["mweb"]}}}
         ios_client = {"extractor_args": {"youtube": {"player_client": ["ios"]}}}
         web_client = {"extractor_args": {"youtube": {"player_client": ["web"]}}}
-        default_client = {}
 
         strategies = []
 
-        # Si hay un proxy residencial configurado, probarlo primero como estrategia prioritaria
-        if proxy and proxy.strip():
-            clean_proxy = proxy.strip()
+        # 1. Si hay un proxy residencial configurado, probarlo primero
+        clean_proxy = proxy.strip() if proxy else ""
+        if clean_proxy:
             strategies.append({**android_client, "proxy": clean_proxy})
-            strategies.append({**mweb_client, "proxy": clean_proxy})
+            strategies.append({**tv_client, "proxy": clean_proxy})
 
-        # Estrategias directas sin proxy (cruciales si el proxy está caído, saturado o bloqueado)
+        # 2. Si hay PoToken configurado
         if potoken and potoken.strip():
             token_clean = potoken.strip()
             po_arg = token_clean if "+" in token_clean else f"web+{token_clean}"
             strategies.append({"extractor_args": {"youtube": {"po_token": [po_arg], "player_client": ["web"]}}})
 
+        # 3. Intentar con cookies de sesión si están disponibles
+        if has_cookies:
+            strategies.append({**android_client, **cookie_arg})
+            strategies.append({**tv_client, **cookie_arg})
+            strategies.append({**default_client, **cookie_arg})
+
+        # 4. Estrategias directas sin cookies (vital si las cookies de Render expiraron o YouTube las rechaza)
         strategies.append(android_client)
+        strategies.append(tv_client)
+        strategies.append(default_client)
         strategies.append(mweb_client)
         strategies.append(ios_client)
-        strategies.append({"extractor_args": {"youtube": {"player_client": ["tv_embedded"]}}})
-        strategies.append(default_client)
+        strategies.append(web_client)
 
         last_error = None
         attempt_errors = []
@@ -230,7 +247,8 @@ class AudioService:
                     raise
                 last_error = e
                 client_tag = extra_opts.get("extractor_args", {}).get("youtube", {}).get("player_client", ["default"])
-                attempt_errors.append(f"client={client_tag}: {str(e)[:120]}")
+                tag = f"{client_tag}{'+cookies' if 'cookiefile' in extra_opts else ''}"
+                attempt_errors.append(f"{tag}: {str(e)[:120]}")
                 continue
 
         # Canal alternativo de alta resiliencia si yt-dlp fue bloqueado por restricciones de datacenter de YouTube
